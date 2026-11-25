@@ -2,6 +2,26 @@
 // Rend n'importe quel rapport (Arrestation, Braquage, Enquête, Mandat, Plainte, Interrogatoire...)
 // sur une vraie feuille papier A4 blanche avec en-tête officiel LSPD, sceau, tampon "CERTIFIÉ CONFORME" et signature.
 
+/**
+ * Met à jour automatiquement la ligne de signature (et l'agent rédacteur) dans le texte d'un rapport
+ * sans écraser les autres modifications manuelles de l'utilisateur.
+ */
+export function syncSigningAgentInText(text, newAgent) {
+  const cleanAgent = (newAgent || "").trim() || "Officier LSPD";
+  let updated = String(text || "").replace(
+    /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
+    (match, prefix, val) => {
+      const hadTrailingSpace = /\s$/.test(val);
+      return `${prefix}${cleanAgent}${hadTrailingSpace ? " " : ""}`;
+    }
+  );
+  updated = updated.replace(
+    /([•\-]\s*(?:Agent rédacteur(?: \(En charge\))?|Officier rédacteur|Agent en charge|Signataire)\s*:\s*)([^\n]+)/gi,
+    (match, prefix) => `${prefix}${cleanAgent}`
+  );
+  return updated;
+}
+
 function wrapLines(ctx, text, maxWidth) {
   if (!text) return [""];
   const paragraphs = String(text).split("\n");

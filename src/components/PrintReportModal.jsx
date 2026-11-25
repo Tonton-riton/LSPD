@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   generatePrintablePaperCanvas,
-  triggerBrowserPrint
+  triggerBrowserPrint,
+  syncSigningAgentInText
 } from "../utils/generatePrintableReport";
 
 export default function PrintReportModal({
@@ -11,26 +12,32 @@ export default function PrintReportModal({
   docNumber,
   date,
   agent,
+  initialCommandVisa = "",
   prevenu,
-  reportText
+  reportText,
+  onSaveChanges
 }) {
   const [signingAgent, setSigningAgent] = useState(agent || "16 | Vance Winchester");
-  const [commandVisa, setCommandVisa] = useState("");
+  const [commandVisa, setCommandVisa] = useState(initialCommandVisa || "");
   const [editableDocNumber, setEditableDocNumber] = useState(docNumber || "LSPD-2026-001");
   const [dataUrl, setDataUrl] = useState(null);
   const [canvasRef, setCanvasRef] = useState(null);
   const [directUrl, setDirectUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
+  const [savedIndicator, setSavedIndicator] = useState(false);
+  const wasOpenRef = useRef(false);
 
-  // Synchronise les champs à l'ouverture de la modale
+  // Synchronise les champs UNIQUEMENT à l'ouverture de la modale (sans écraser pendant la saisie)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setSigningAgent(agent || "16 | Vance Winchester");
       setEditableDocNumber(docNumber || "LSPD-2026-001");
-      setCommandVisa("");
+      setCommandVisa(initialCommandVisa || "");
+      setSavedIndicator(false);
     }
-  }, [isOpen, agent, docNumber]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen, agent, docNumber, initialCommandVisa]);
 
   const uploadToPrinterEndpoint = useCallback(async (urlData, docRef) => {
     if (!window.location.protocol.startsWith("http")) return;
@@ -61,11 +68,7 @@ export default function PrintReportModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Remplace aussi la ligne "Signé : ..." dans le corps du texte si l'agent a été modifié dans la modale
-    const adjustedText = String(reportText || "").replace(
-      /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
-      (match, prefix) => `${prefix}${signingAgent || "Officier LSPD"} `
-    );
+    const adjustedText = syncSigningAgentInText(reportText, signingAgent);
 
     const canvas = generatePrintablePaperCanvas({
       title,
@@ -99,6 +102,32 @@ export default function PrintReportModal({
   ]);
 
   if (!isOpen) return null;
+
+  const notifyParentSave = (nextAgent, nextVisa, nextDocNum) => {
+    if (!onSaveChanges) return;
+    onSaveChanges({
+      agent: nextAgent,
+      commandVisa: nextVisa,
+      docNumber: nextDocNum,
+      reportText: syncSigningAgentInText(reportText, nextAgent)
+    });
+    setSavedIndicator(true);
+  };
+
+  const handleSigningAgentChange = (val) => {
+    setSigningAgent(val);
+    notifyParentSave(val, commandVisa, editableDocNumber);
+  };
+
+  const handleCommandVisaChange = (val) => {
+    setCommandVisa(val);
+    notifyParentSave(signingAgent, val, editableDocNumber);
+  };
+
+  const handleDocNumberChange = (val) => {
+    setEditableDocNumber(val);
+    notifyParentSave(signingAgent, commandVisa, val);
+  };
 
   const showStatus = (msg) => {
     setStatusMsg(msg);
@@ -197,9 +226,27 @@ export default function PrintReportModal({
           }}
         >
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--gold-seal)", textTransform: "uppercase", marginBottom: 4 }}>
-              <i className="fas fa-signature" style={{ marginRight: 5 }}></i>
-              Agent qui signe le rapport (Modifiable)
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--gold-seal)",
+                textTransform: "uppercase",
+                marginBottom: 4
+              }}
+            >
+              <span>
+                <i className="fas fa-signature" style={{ marginRight: 5 }}></i>
+                Agent qui signe le rapport (Modifiable)
+              </span>
+              {onSaveChanges && savedIndicator && (
+                <span style={{ color: "var(--green)", fontSize: 10.5 }}>
+                  <i className="fas fa-check"></i> Enregistré dans le dossier
+                </span>
+              )}
             </label>
             <input
               type="text"
@@ -207,7 +254,7 @@ export default function PrintReportModal({
               style={{ padding: "7px 10px", fontSize: 13.5 }}
               placeholder="Ex: 18 | Lieutenant Carter"
               value={signingAgent}
-              onChange={e => setSigningAgent(e.target.value)}
+              onChange={e => handleSigningAgentChange(e.target.value)}
             />
           </div>
 
@@ -222,7 +269,7 @@ export default function PrintReportModal({
               style={{ padding: "7px 10px", fontSize: 13.5 }}
               placeholder="Ex: Cdt. Miller / Procureur..."
               value={commandVisa}
-              onChange={e => setCommandVisa(e.target.value)}
+              onChange={e => handleCommandVisaChange(e.target.value)}
             />
           </div>
 
@@ -235,7 +282,7 @@ export default function PrintReportModal({
               className="input mono"
               style={{ padding: "7px 10px", fontSize: 13 }}
               value={editableDocNumber}
-              onChange={e => setEditableDocNumber(e.target.value)}
+              onChange={e => handleDocNumberChange(e.target.value)}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { LSPD_TEMPLATES, LSPD_TEMPLATE_GROUPS } from "../data/lspdTemplates";
 import PrintReportModal from "./PrintReportModal";
+import { syncSigningAgentInText } from "../utils/generatePrintableReport";
 
 export { LSPD_TEMPLATES };
 
@@ -267,16 +268,29 @@ export default function InvestigationsView({
     setSubView("dossiers");
   };
 
+  const handlePatchCaseById = (caseId, patch) => {
+    if (!caseId) return;
+    setCases(prev => {
+      const next = prev.map(c => (c.id === caseId ? { ...c, ...patch } : c));
+      try {
+        localStorage.setItem(STORAGE_CASES_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   const handleUpdateActiveCase = (field, value) => {
     if (!activeCase) return;
     const next = cases.map(c => {
       if (c.id !== activeCase.id) return c;
       if (field === "leadAgent" && c.reportText) {
-        const syncedText = String(c.reportText).replace(
-          /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
-          (match, prefix) => `${prefix}${value || "Officier LSPD"} `
-        );
-        return { ...c, leadAgent: value, reportText: syncedText };
+        return {
+          ...c,
+          leadAgent: value,
+          reportText: syncSigningAgentInText(c.reportText, value)
+        };
       }
       return { ...c, [field]: value };
     });
@@ -592,8 +606,11 @@ export default function InvestigationsView({
                         <span style={{ color: pr.color, fontWeight: 700 }}>{pr.label}</span>
                       </div>
 
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
-                        <span>{c.division}</span>
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between", gap: 6 }}>
+                        <span>
+                          <i className="fas fa-signature" style={{ marginRight: 4, color: "var(--gold-seal)" }}></i>
+                          {c.leadAgent || meta?.agent || "LSPD"}
+                        </span>
                         <span>{c.createdAt}</span>
                       </div>
                     </div>
@@ -666,16 +683,59 @@ export default function InvestigationsView({
                     </div>
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Agent rédacteur / Signataire</label>
+                  <div
+                    className="form-row"
+                    style={{
+                      background: "rgba(59, 130, 246, 0.07)",
+                      border: "1px solid rgba(223, 181, 86, 0.3)",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      marginBottom: 14
+                    }}
+                  >
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ color: "var(--gold-seal)" }}>
+                        <i className="fas fa-signature" style={{ marginRight: 5 }}></i>
+                        Agent qui signe / Rédacteur
+                      </label>
                       <input
                         type="text"
                         placeholder="Ex: 16 | Vance Winchester"
-                        value={activeCase.leadAgent || ""}
+                        value={activeCase.leadAgent ?? ""}
                         onChange={e => handleUpdateActiveCase("leadAgent", e.target.value)}
                       />
                     </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>
+                        <i className="fas fa-stamp" style={{ marginRight: 5 }}></i>
+                        Visa Commandement / DOJ
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Optionnel (Ex: Cdt. Miller / Procureur)"
+                        value={activeCase.commandVisa || ""}
+                        onChange={e => handleUpdateActiveCase("commandVisa", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Division LSPD</label>
+                      <input
+                        type="text"
+                        value={activeCase.division || ""}
+                        onChange={e => handleUpdateActiveCase("division", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Date & Heure</label>
+                      <input
+                        type="text"
+                        value={activeCase.createdAt || ""}
+                        onChange={e => handleUpdateActiveCase("createdAt", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
                     <div className="form-group">
                       <label>Suspect / Cible Principale</label>
                       <input
@@ -758,9 +818,26 @@ export default function InvestigationsView({
                               fontSize: 13
                             }}
                           >
-                            <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <strong>{s.name}</strong>
-                              <span className="brand-badge" style={{ marginLeft: 8 }}>{s.status}</span>
+                              <select
+                                className="select"
+                                style={{ padding: "2px 6px", fontSize: 11.5, width: "auto" }}
+                                value={s.status}
+                                onChange={e => {
+                                  const nextList = (activeCase.suspects || []).map((item, i) =>
+                                    i === idx ? { ...item, status: e.target.value } : item
+                                  );
+                                  handleUpdateActiveCase("suspects", nextList);
+                                }}
+                              >
+                                <option value="Recherché">Recherché</option>
+                                <option value="Sous surveillance">Surveillance</option>
+                                <option value="En garde à vue">Garde à vue</option>
+                                <option value="Condamné">Condamné</option>
+                                <option value="Cible principale">Cible principale</option>
+                                <option value="Mis en cause">Mis en cause</option>
+                              </select>
                             </div>
                             <div style={{ display: "flex", gap: 4 }}>
                               <button
@@ -877,10 +954,12 @@ export default function InvestigationsView({
                       style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
                       onClick={() =>
                         setPrintPayload({
+                          caseId: activeCase.id,
                           title: activeCase.title,
                           docNumber: activeCase.caseNumber,
                           date: (activeCase.createdAt || "").split(" ")[0] || meta?.date,
                           agent: activeCase.leadAgent || meta?.agent,
+                          commandVisa: activeCase.commandVisa || "",
                           prevenu: activeCase.targetName,
                           reportText: activeCase.reportText
                         })
@@ -932,8 +1011,21 @@ export default function InvestigationsView({
         docNumber={printPayload?.docNumber}
         date={printPayload?.date}
         agent={printPayload?.agent}
+        initialCommandVisa={printPayload?.commandVisa || ""}
         prevenu={printPayload?.prevenu}
         reportText={printPayload?.reportText}
+        onSaveChanges={
+          printPayload?.caseId
+            ? ({ agent: nextAgent, commandVisa: nextVisa, docNumber: nextDoc, reportText: nextText }) => {
+                handlePatchCaseById(printPayload.caseId, {
+                  leadAgent: nextAgent,
+                  commandVisa: nextVisa,
+                  caseNumber: nextDoc,
+                  reportText: nextText
+                });
+              }
+            : undefined
+        }
       />
 
       {/* MODAL CRÉATION DOSSIER */}

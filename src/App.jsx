@@ -5,6 +5,7 @@ import {
   INITIAL_AGGRAVANTES
 } from "./data/sheetData";
 import { calculateDossierSummary } from "./utils/formulaEngine";
+import { syncSigningAgentInText } from "./utils/generatePrintableReport";
 import CalculatorView from "./components/CalculatorView";
 import PenalTableView from "./components/PenalTableView";
 import WeaponsGuideView from "./components/WeaponsGuideView";
@@ -230,6 +231,19 @@ export default function App() {
   const handleValidateAndArchive = (archiveEntry) => {
     setHistory(prev => [archiveEntry, ...prev]);
     showToast(`Dossier ${archiveEntry.id} enregistré (${archiveEntry.prevenu}) — Total $${Number(archiveEntry.amendeRetenue).toLocaleString("fr-FR")}`);
+  };
+
+  const handleUpdateHistoryItem = (idx, patch) => {
+    setHistory(prev =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const merged = { ...item, ...patch };
+        if (patch.agent !== undefined && !patch.reportText && merged.reportText) {
+          merged.reportText = syncSigningAgentInText(merged.reportText, patch.agent);
+        }
+        return merged;
+      })
+    );
   };
 
   const handleLoadHistoryItem = (item) => {
@@ -556,6 +570,7 @@ export default function App() {
               history={history}
               onClearHistory={() => setHistory([])}
               onDeleteHistoryItem={idx => setHistory(prev => prev.filter((_, i) => i !== idx))}
+              onUpdateHistoryItem={handleUpdateHistoryItem}
               onLoadHistoryItem={handleLoadHistoryItem}
               onNavigate={setActiveTab}
               infractions={infractions}

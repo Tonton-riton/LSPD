@@ -6,6 +6,7 @@ import {
   calculateOffenseRow
 } from "../utils/formulaEngine";
 import { generatePenaltyCanvas } from "../utils/generatePenaltyImage";
+import { syncSigningAgentInText } from "../utils/generatePrintableReport";
 import { LSPD_TEMPLATES } from "../data/lspdTemplates";
 import PrintReportModal from "./PrintReportModal";
 
@@ -378,12 +379,7 @@ export default function CalculatorView({
   // Si l'agent signataire change alors que le rapport a déjà été édité manuellement, met à jour la ligne de signature sans écraser le reste
   useEffect(() => {
     if (isReportManuallyEdited && meta.agent) {
-      setEditedReportText(prev =>
-        String(prev || "").replace(
-          /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
-          (match, prefix) => `${prefix}${meta.agent} `
-        )
-      );
+      setEditedReportText(prev => syncSigningAgentInText(prev, meta.agent));
     }
   }, [meta.agent, isReportManuallyEdited]);
 
@@ -473,6 +469,8 @@ export default function CalculatorView({
         amendeRetenue: activePalier.amende,
         peineRetenueMinutes: activePalier.peineMinutes,
         notes,
+        commandVisa: "",
+        reportText: editedReportText,
         rowsSnapshot: summary.activeRows.map(r => ({
           infractionId: r.infractionId,
           aggravanteIds: r.aggravanteIds,
@@ -1417,6 +1415,17 @@ export default function CalculatorView({
         agent={meta.agent}
         prevenu={meta.prevenu}
         reportText={outputTab === "miranda" ? editedMirandaText : editedReportText}
+        onSaveChanges={({ agent: nextAgent, docNumber: nextDoc, reportText: nextText }) => {
+          if (nextAgent !== undefined) {
+            setMeta(p => ({ ...p, agent: nextAgent }));
+          }
+          if (nextDoc !== undefined) {
+            setSerial(nextDoc);
+          }
+          if (outputTab === "rapport" && nextText !== undefined) {
+            setEditedReportText(nextText);
+          }
+        }}
       />
 
       {/* MODAL LOI */}
