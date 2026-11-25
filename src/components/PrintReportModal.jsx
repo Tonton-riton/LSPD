@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   generatePrintablePaperCanvas,
   triggerBrowserPrint
@@ -14,51 +14,89 @@ export default function PrintReportModal({
   prevenu,
   reportText
 }) {
+  const [signingAgent, setSigningAgent] = useState(agent || "16 | Vance Winchester");
+  const [commandVisa, setCommandVisa] = useState("");
+  const [editableDocNumber, setEditableDocNumber] = useState(docNumber || "LSPD-2026-001");
   const [dataUrl, setDataUrl] = useState(null);
   const [canvasRef, setCanvasRef] = useState(null);
   const [directUrl, setDirectUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
 
+  // Synchronise les champs à l'ouverture de la modale
+  useEffect(() => {
+    if (isOpen) {
+      setSigningAgent(agent || "16 | Vance Winchester");
+      setEditableDocNumber(docNumber || "LSPD-2026-001");
+      setCommandVisa("");
+    }
+  }, [isOpen, agent, docNumber]);
+
+  const uploadToPrinterEndpoint = useCallback(async (urlData, docRef) => {
+    if (!window.location.protocol.startsWith("http")) return;
+    setUploading(true);
+    try {
+      const resp = await fetch("/api/print-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageData: urlData,
+          docNumber: docRef || "LSPD"
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.path) {
+          setDirectUrl(`${window.location.origin}${data.path}`);
+        }
+      }
+    } catch {
+      // mode offline
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  // Re-rend la feuille papier A4 en temps réel dès que le signataire, visa ou numéro change
   useEffect(() => {
     if (!isOpen) return;
+
+    // Remplace aussi la ligne "Signé : ..." dans le corps du texte si l'agent a été modifié dans la modale
+    const adjustedText = String(reportText || "").replace(
+      /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
+      (match, prefix) => `${prefix}${signingAgent || "Officier LSPD"} `
+    );
+
     const canvas = generatePrintablePaperCanvas({
       title,
-      docNumber,
+      docNumber: editableDocNumber,
       date,
-      agent,
+      agent: signingAgent,
+      commandVisa,
       prevenu,
-      reportText
+      reportText: adjustedText
     });
     const url = canvas.toDataURL("image/png");
     setCanvasRef(canvas);
     setDataUrl(url);
-    setDirectUrl("");
-    setStatusMsg(null);
 
-    // Tenter de générer automatiquement le lien direct .png pour imprimante FiveM si hébergé sur serveur Node/Render
-    if (window.location.protocol.startsWith("http")) {
-      setUploading(true);
-      fetch("/api/print-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageData: url,
-          docNumber: docNumber || "LSPD"
-        })
-      })
-        .then(r => (r.ok ? r.json() : null))
-        .then(data => {
-          if (data && data.path) {
-            setDirectUrl(`${window.location.origin}${data.path}`);
-          }
-        })
-        .catch(() => {
-          // Mode local Vite sans API ou offline : l'utilisateur utilise Copier l'image / Télécharger PNG
-        })
-        .finally(() => setUploading(false));
-    }
-  }, [isOpen, title, docNumber, date, agent, prevenu, reportText]);
+    // Debounce l'upload vers /api/print-image quand l'utilisateur tape le nom du signataire
+    const timer = setTimeout(() => {
+      uploadToPrinterEndpoint(url, editableDocNumber);
+    }, 380);
+
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    title,
+    editableDocNumber,
+    date,
+    signingAgent,
+    commandVisa,
+    prevenu,
+    reportText,
+    uploadToPrinterEndpoint
+  ]);
 
   if (!isOpen) return null;
 
@@ -90,7 +128,7 @@ export default function PrintReportModal({
 
   const handleDownloadPng = () => {
     if (!dataUrl) return;
-    const safeName = (docNumber || prevenu || "Rapport_LSPD").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeName = (editableDocNumber || prevenu || "Rapport_LSPD").replace(/[^a-zA-Z0-9_-]/g, "_");
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `Feuille_LSPD_${safeName}.png`;
@@ -100,7 +138,7 @@ export default function PrintReportModal({
 
   const handleBrowserPrint = () => {
     if (!dataUrl) return;
-    triggerBrowserPrint(dataUrl, `Rapport LSPD — ${docNumber || ""}`);
+    triggerBrowserPrint(dataUrl, `Rapport LSPD — ${editableDocNumber || ""}`);
   };
 
   return (
@@ -147,26 +185,81 @@ export default function PrintReportModal({
           </div>
         </div>
 
-        {/* DIRECT FIVEM IN-GAME PRINTER URL BOX */}
+        {/* BARRE DE PERSONNALISATION DE LA SIGNATURE & DU VISA AVANT IMPRESSION */}
         <div
           style={{
             padding: "12px 20px",
+            background: "#0c192e",
+            borderBottom: "1px solid var(--border)",
+            display: "grid",
+            gridTemplateColumns: "1.3fr 1.1fr 0.9fr",
+            gap: 12
+          }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--gold-seal)", textTransform: "uppercase", marginBottom: 4 }}>
+              <i className="fas fa-signature" style={{ marginRight: 5 }}></i>
+              Agent qui signe le rapport (Modifiable)
+            </label>
+            <input
+              type="text"
+              className="input"
+              style={{ padding: "7px 10px", fontSize: 13.5 }}
+              placeholder="Ex: 18 | Lieutenant Carter"
+              value={signingAgent}
+              onChange={e => setSigningAgent(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 4 }}>
+              <i className="fas fa-stamp" style={{ marginRight: 5 }}></i>
+              Visa Commandement / DOJ (Optionnel)
+            </label>
+            <input
+              type="text"
+              className="input"
+              style={{ padding: "7px 10px", fontSize: 13.5 }}
+              placeholder="Ex: Cdt. Miller / Procureur..."
+              value={commandVisa}
+              onChange={e => setCommandVisa(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 4 }}>
+              N° Référence Document
+            </label>
+            <input
+              type="text"
+              className="input mono"
+              style={{ padding: "7px 10px", fontSize: 13 }}
+              value={editableDocNumber}
+              onChange={e => setEditableDocNumber(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* DIRECT FIVEM IN-GAME PRINTER URL BOX */}
+        <div
+          style={{
+            padding: "10px 20px",
             background: "#091529",
             borderBottom: "1px solid var(--border)",
             display: "flex",
             flexDirection: "column",
-            gap: 8
+            gap: 6
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--gold-seal)" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--gold-seal)" }}>
               <i className="fas fa-link" style={{ marginRight: 6 }}></i>
               LIEN DIRECT POUR IMPRIMANTE IN-GAME (FIVEM — URL .PNG) :
             </span>
             {uploading && (
               <span style={{ fontSize: 12, color: "var(--blue)" }}>
                 <i className="fas fa-spinner fa-spin" style={{ marginRight: 5 }}></i>
-                Génération du lien d'impression en jeu...
+                Mise à jour du lien .PNG...
               </span>
             )}
           </div>
@@ -186,10 +279,10 @@ export default function PrintReportModal({
               </button>
             </div>
           ) : (
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {uploading
                 ? "Préparation de l'URL..."
-                : "Astuce FiveM : Sur votre site en ligne Render, un lien direct .PNG s'affiche automatiquement ici pour votre imprimante RP. En mode local/fichier, cliquez sur « Copier Image » puis collez-la sur Discord (Ctrl+V) et copiez le lien de l'image dans votre imprimante en jeu !"}
+                : "Astuce FiveM : Sur votre site Render en ligne, un lien direct .PNG s'affiche ici automatiquement. En local, utilisez « Copier Image » puis collez sur Discord pour obtenir le lien d'imprimante RP."}
             </div>
           )}
         </div>

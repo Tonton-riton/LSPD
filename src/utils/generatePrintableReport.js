@@ -113,6 +113,7 @@ export function generatePrintablePaperCanvas({
   docNumber = "LSPD-2026-001",
   date = "",
   agent = "16 | Vance Winchester",
+  commandVisa = "",
   prevenu = "",
   reportText = ""
 }) {
@@ -452,9 +453,15 @@ export function generatePrintablePaperCanvas({
   ctx.fillText("VISA COMMANDEMENT / BUREAU DU PROCUREUR", width - marginX, sigY + 22);
   ctx.strokeStyle = "#cbd5e1";
   ctx.strokeRect(width - marginX - 230, sigY + 32, 230, 50);
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "600 10px 'Inter', sans-serif";
-  ctx.fillText("Cachet / Visa DOJ (si requis)", width - marginX - 10, sigY + 62);
+  if (commandVisa && commandVisa.trim()) {
+    ctx.fillStyle = "#0b1e36";
+    ctx.font = "italic 700 18px Georgia, serif";
+    ctx.fillText(commandVisa.trim().slice(0, 26), width - marginX - 12, sigY + 62);
+  } else {
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "600 10px 'Inter', sans-serif";
+    ctx.fillText("Cachet / Visa DOJ (si requis)", width - marginX - 10, sigY + 62);
+  }
   ctx.textAlign = "left";
 
   // Bottom legal footer

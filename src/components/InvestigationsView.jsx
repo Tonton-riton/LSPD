@@ -111,6 +111,7 @@ export default function InvestigationsView({
     templateId: LSPD_TEMPLATES[0].id,
     caseNumber: `LSPD-BRQ-2026-${String(Math.floor(100 + Math.random() * 899))}`,
     title: "",
+    leadAgent: meta?.agent || "16 | Vance Winchester",
     division: "Patrouille / Intervention LSPD",
     status: "in_progress",
     priority: "high",
@@ -172,10 +173,11 @@ export default function InvestigationsView({
     const heureStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const titleVal = newForm.title.trim() || tpl.title;
 
+    const chosenAgent = (newForm.leadAgent || "").trim() || meta?.agent || "16 | Vance Winchester";
     const generatedText = tpl.generateContent({
       caseNumber: newForm.caseNumber,
       title: titleVal,
-      agent: meta?.agent || "16 | Vance Winchester",
+      agent: chosenAgent,
       targetName: newForm.targetName,
       targetGroup: newForm.targetGroup,
       location: newForm.location,
@@ -191,7 +193,7 @@ export default function InvestigationsView({
       division: newForm.division,
       status: newForm.status,
       priority: newForm.priority,
-      leadAgent: meta?.agent || "16 | Vance Winchester",
+      leadAgent: chosenAgent,
       targetName: newForm.targetName.trim() || "Contre X",
       targetGroup: newForm.targetGroup.trim() || "Indépendant",
       location: newForm.location.trim() || "Los Santos",
@@ -212,6 +214,7 @@ export default function InvestigationsView({
       templateId: LSPD_TEMPLATES[0].id,
       caseNumber: `LSPD-BRQ-2026-${String(Math.floor(100 + Math.random() * 899))}`,
       title: "",
+      leadAgent: meta?.agent || "16 | Vance Winchester",
       division: "Patrouille / Intervention LSPD",
       status: "in_progress",
       priority: "high",
@@ -266,7 +269,17 @@ export default function InvestigationsView({
 
   const handleUpdateActiveCase = (field, value) => {
     if (!activeCase) return;
-    const next = cases.map(c => (c.id === activeCase.id ? { ...c, [field]: value } : c));
+    const next = cases.map(c => {
+      if (c.id !== activeCase.id) return c;
+      if (field === "leadAgent" && c.reportText) {
+        const syncedText = String(c.reportText).replace(
+          /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
+          (match, prefix) => `${prefix}${value || "Officier LSPD"} `
+        );
+        return { ...c, leadAgent: value, reportText: syncedText };
+      }
+      return { ...c, [field]: value };
+    });
     saveCases(next);
   };
 
@@ -655,6 +668,15 @@ export default function InvestigationsView({
 
                   <div className="form-row">
                     <div className="form-group">
+                      <label>Agent rédacteur / Signataire</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 16 | Vance Winchester"
+                        value={activeCase.leadAgent || ""}
+                        onChange={e => handleUpdateActiveCase("leadAgent", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
                       <label>Suspect / Cible Principale</label>
                       <input
                         type="text"
@@ -985,6 +1007,15 @@ export default function InvestigationsView({
                 </div>
 
                 <div className="form-row">
+                  <div className="form-group">
+                    <label>Agent rédacteur / Signataire</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 16 | Vance Winchester"
+                      value={newForm.leadAgent}
+                      onChange={e => setNewForm(p => ({ ...p, leadAgent: e.target.value }))}
+                    />
+                  </div>
                   <div className="form-group">
                     <label>Suspect / Cible (RP)</label>
                     <input
