@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { LSPD_TEMPLATES, LSPD_TEMPLATE_GROUPS } from "../data/lspdTemplates";
+import PrintReportModal from "./PrintReportModal";
 
 export { LSPD_TEMPLATES };
 
@@ -102,6 +103,7 @@ export default function InvestigationsView({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [copiedId, setCopiedId] = useState(null);
+  const [printPayload, setPrintPayload] = useState(null);
 
   // New Case Modal state
   const [showNewModal, setShowNewModal] = useState(false);
@@ -458,6 +460,25 @@ export default function InvestigationsView({
                         <i className="fas fa-calculator"></i> Peines
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+                      onClick={() =>
+                        setPrintPayload({
+                          title: tpl.title,
+                          docNumber: `LSPD-${tpl.category.replace(/[^A-Z0-9]/gi, "").slice(0, 3).toUpperCase()}-2026`,
+                          date: meta?.date,
+                          agent: meta?.agent,
+                          prevenu: meta?.prevenu,
+                          reportText: sampleText
+                        })
+                      }
+                      title="Imprimer ce template en jeu (Feuille Papier A4 LSPD + Lien .PNG)"
+                    >
+                      <i className="fas fa-print"></i> Imprimer
+                    </button>
 
                     <button
                       type="button"
@@ -830,6 +851,25 @@ export default function InvestigationsView({
 
                     <button
                       type="button"
+                      className="btn btn-sm btn-outline"
+                      style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+                      onClick={() =>
+                        setPrintPayload({
+                          title: activeCase.title,
+                          docNumber: activeCase.caseNumber,
+                          date: (activeCase.createdAt || "").split(" ")[0] || meta?.date,
+                          agent: activeCase.leadAgent || meta?.agent,
+                          prevenu: activeCase.targetName,
+                          reportText: activeCase.reportText
+                        })
+                      }
+                      title="Imprimer ce dossier en jeu (Feuille Papier A4 LSPD + Lien .PNG direct)"
+                    >
+                      <i className="fas fa-print"></i> Imprimer en jeu
+                    </button>
+
+                    <button
+                      type="button"
                       className="btn btn-sm btn-primary"
                       onClick={() => handleCopyText("active_case_report", activeCase.reportText)}
                     >
@@ -861,6 +901,18 @@ export default function InvestigationsView({
           ) : null}
         </div>
       )}
+
+      {/* MODAL IMPRESSION EN JEU (FEUILLE PAPIER A4 LSPD + LIEN DIRECT IMPRIMANTE FIVEM) */}
+      <PrintReportModal
+        isOpen={Boolean(printPayload)}
+        onClose={() => setPrintPayload(null)}
+        title={printPayload?.title}
+        docNumber={printPayload?.docNumber}
+        date={printPayload?.date}
+        agent={printPayload?.agent}
+        prevenu={printPayload?.prevenu}
+        reportText={printPayload?.reportText}
+      />
 
       {/* MODAL CRÉATION DOSSIER */}
       {showNewModal && (

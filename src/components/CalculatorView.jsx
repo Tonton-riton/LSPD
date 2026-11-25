@@ -7,6 +7,7 @@ import {
 } from "../utils/formulaEngine";
 import { generatePenaltyCanvas } from "../utils/generatePenaltyImage";
 import { LSPD_TEMPLATES } from "../data/lspdTemplates";
+import PrintReportModal from "./PrintReportModal";
 
 export function getCategoryBadgeClass(cat) {
   const c = String(cat || "").toLowerCase();
@@ -74,6 +75,7 @@ export default function CalculatorView({
   const [inspectedInfraction, setInspectedInfraction] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [imageStatusMsg, setImageStatusMsg] = useState(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const infractionsMap = useMemo(() => new Map(infractions.map(i => [i.id, i])), [infractions]);
   const aggravantesByInf = useMemo(() => {
@@ -1220,6 +1222,15 @@ export default function CalculatorView({
               )}
               <button
                 type="button"
+                className="btn btn-sm btn-outline"
+                style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+                onClick={() => setShowPrintModal(true)}
+                title="Générer une feuille papier A4 officielle LSPD imprimable en jeu (FiveM) + Lien .PNG direct"
+              >
+                <i className="fas fa-print"></i> Imprimer en jeu
+              </button>
+              <button
+                type="button"
                 className="btn btn-sm btn-primary"
                 onClick={() =>
                   handleCopy(
@@ -1377,6 +1388,24 @@ export default function CalculatorView({
           </div>
         </div>
       )}
+
+      {/* MODAL IMPRESSION PAPIER EN JEU (FEUILLE A4 LSPD + LIEN DIRECT IMPRIMANTE FIVEM) */}
+      <PrintReportModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title={
+          outputTab === "miranda"
+            ? "NOTIFICATION OFFICIELLE DES DROITS MIRANDA"
+            : activeReportTemplateId && activeReportTemplateId !== "standard"
+            ? (LSPD_TEMPLATES.find(t => t.id === activeReportTemplateId)?.title || "RAPPORT D'INTERVENTION LSPD")
+            : "RAPPORT D'ARRESTATION & PROCÈS-VERBAL (ART. 123)"
+        }
+        docNumber={serial || "LSPD-RA-2026"}
+        date={meta.date}
+        agent={meta.agent}
+        prevenu={meta.prevenu}
+        reportText={outputTab === "miranda" ? editedMirandaText : editedReportText}
+      />
 
       {/* MODAL LOI */}
       {inspectedInfraction && (
