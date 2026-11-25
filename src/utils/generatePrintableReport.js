@@ -194,11 +194,29 @@ export function generatePrintablePaperCanvas({
       bodyHeight += 38;
       laidOut.push({ ...block, h: 38 });
     } else if (block.type === "kv") {
-      mCtx.font = "500 15px 'Inter', sans-serif";
-      const valLines = wrapLines(mCtx, block.value || "—", contentWidth - 260);
-      const h = Math.max(24, valLines.length * 21 + 5);
-      bodyHeight += h;
-      laidOut.push({ ...block, valLines, h });
+      const labelText = `▪ ${block.label} :`;
+      mCtx.font = "700 14px 'Inter', sans-serif";
+      const labelWidth = mCtx.measureText(labelText).width;
+      const valStr = block.value || "—";
+
+      // Si le libellé est long (> 290px) ou le texte est un long récit (> 85 caractères),
+      // on affiche le libellé sur sa propre ligne puis le contenu en pleine largeur dessous (zéro chevauchement).
+      const useStacked = labelWidth > 290 || valStr.length > 85;
+
+      if (useStacked) {
+        mCtx.font = "400 14.5px 'Inter', sans-serif";
+        const valLines = wrapLines(mCtx, valStr, contentWidth - 32);
+        const h = 24 + valLines.length * 21 + 8;
+        bodyHeight += h;
+        laidOut.push({ ...block, labelText, stacked: true, valLines, h });
+      } else {
+        const valOffsetX = Math.max(255, Math.ceil(labelWidth) + 20);
+        mCtx.font = "500 14.5px 'Inter', sans-serif";
+        const valLines = wrapLines(mCtx, valStr, contentWidth - valOffsetX - 10);
+        const h = Math.max(26, valLines.length * 21 + 7);
+        bodyHeight += h;
+        laidOut.push({ ...block, labelText, stacked: false, valOffsetX, valLines, h });
+      }
     } else if (block.type === "charge") {
       mCtx.font = "700 15px 'Inter', sans-serif";
       const lines = wrapLines(mCtx, block.text, contentWidth - 20);
@@ -337,18 +355,27 @@ export function generatePrintablePaperCanvas({
 
       curY += 32;
     } else if (item.type === "kv") {
-      // Subtle separator line
-      ctx.fillStyle = "#1e293b";
+      ctx.fillStyle = "#0b1e36";
       ctx.font = "700 14px 'Inter', sans-serif";
-      ctx.fillText(`▪ ${item.label} :`, marginX + 6, curY + 15);
+      ctx.fillText(item.labelText, marginX + 6, curY + 16);
 
-      ctx.fillStyle = "#0f172a";
-      ctx.font = "500 14.5px 'Inter', sans-serif";
-      let ly = curY + 15;
-      item.valLines.forEach(line => {
-        ctx.fillText(line, marginX + 250, ly);
-        ly += 21;
-      });
+      if (item.stacked) {
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "400 14.5px 'Inter', sans-serif";
+        let ly = curY + 38;
+        item.valLines.forEach(line => {
+          ctx.fillText(line, marginX + 22, ly);
+          ly += 21;
+        });
+      } else {
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "500 14.5px 'Inter', sans-serif";
+        let ly = curY + 16;
+        item.valLines.forEach(line => {
+          ctx.fillText(line, marginX + item.valOffsetX, ly);
+          ly += 21;
+        });
+      }
 
       ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
       ctx.lineWidth = 1;
