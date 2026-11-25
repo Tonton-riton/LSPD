@@ -1,0 +1,275 @@
+/* Thème Officiel LSPD (Bleu Police / Navy / Or) */
+
+:root,
+[data-theme="lspd-blue"] {
+  --bg-primary: #060b14;
+  --bg-secondary: #0b1322;
+  --bg-card: #101b30;
+  --bg-card-hover: #162440;
+  --bg-sidebar: #080e1a;
+  --border: #1e3050;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #5b6e8c;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-glow: rgba(59, 130, 246, 0.45);
+  --green: #00e676;
+  --green-bg: rgba(0, 230, 118, 0.12);
+  --blue: #38bdf8;
+  --blue-bg: rgba(56, 189, 248, 0.14);
+  --orange: #f59e0b;
+  --orange-bg: rgba(245, 158, 11, 0.14);
+  --red: #ef4444;
+  --red-bg: rgba(239, 68, 68, 0.15);
+  --yellow: #fbbf24;
+  --purple: #a855f7;
+}
+
+[data-theme="doj-gold"] {
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-glow: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="bcso-emerald"] {
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-glow: rgba(16, 185, 129, 0.4);
+}
+
+.mono {
+  font-family: 'Orbitron', 'JetBrains Mono', monospace;
+}
+
+/* Badges de catégories pénales */
+.cat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.cat-contravention {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.cat-delit-mineur {
+  background: var(--blue-bg);
+  color: var(--blue);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.cat-delit-majeur {
+  background: var(--orange-bg);
+  color: var(--orange);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.cat-crime {
+  background: var(--red-bg);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Chips Circonstances Aggravantes (Bleu LSPD) */
+.agg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Rajdhani', sans-serif;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.agg-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.agg-chip.selected {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+/* Boutons Tentative / Complicité / Avocat */
+.modifier-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.modifier-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.modifier-pill.active-tentative {
+  background: var(--orange-bg);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.modifier-pill.active-complicite {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--purple);
+  color: #c084fc;
+}
+
+.modifier-pill.active-avocat {
+  background: var(--blue-bg);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* Cartes des 5 Paliers (MIN 1, MIN 2, NOMINALE, AGGRAVÉ, MAXIMAL) en Bleu LSPD */
+.palier-card {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.palier-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.palier-card.active {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.16);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.22);
+}
+
+.mdt-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.mdt-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mdt-table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.mdt-table td {
+  padding: 12px 14px;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(30, 48, 80, 0.6);
+  color: var(--text-secondary);
+}
+
+.mdt-table tr:hover td {
+  background: rgba(59, 130, 246, 0.05);
+  color: var(--text-primary);
+}
+
+.brand-badge {
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.role-badge.patron {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.alert-danger {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.alert-warning {
+  background: var(--orange-bg);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: var(--orange);
+}
+
+.alert-info {
+  background: var(--blue-bg);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: var(--blue);
+}
+
+.input,
+.select,
+.textarea {
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent);
+}
