@@ -1,16 +1,21 @@
-/* Thème Officiel LSPD (Bleu Police / Navy / Or) */
+/* ================================================================
+   LOS SANTOS POLICE DEPARTMENT (LSPD) & DOJ — TERMINAL MDT OFFICIEL
+   Charte Police Blue, Navy & Gold Seal (San Andreas)
+   ================================================================ */
 
 :root,
 [data-theme="lspd-blue"] {
-  --bg-primary: #060b14;
-  --bg-secondary: #0b1322;
-  --bg-card: #101b30;
-  --bg-card-hover: #162440;
-  --bg-sidebar: #080e1a;
-  --border: #1e3050;
-  --text-primary: #f1f5f9;
+  --bg-primary: #050a14;
+  --bg-secondary: #091324;
+  --bg-card: #0e1c33;
+  --bg-card-hover: #142645;
+  --bg-sidebar: #070f1d;
+  --border: #1b3358;
+  --border-gold: #c59b27;
+  --gold-seal: #dfb556;
+  --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-muted: #5b6e8c;
+  --text-muted: #5c7496;
   --accent: #3b82f6;
   --accent-hover: #2563eb;
   --accent-glow: rgba(59, 130, 246, 0.45);
@@ -24,12 +29,13 @@
   --red-bg: rgba(239, 68, 68, 0.15);
   --yellow: #fbbf24;
   --purple: #a855f7;
+  --sidebar-width: 275px;
 }
 
 [data-theme="doj-gold"] {
-  --accent: #f59e0b;
-  --accent-hover: #d97706;
-  --accent-glow: rgba(245, 158, 11, 0.4);
+  --accent: #dfb556;
+  --accent-hover: #c59b27;
+  --accent-glow: rgba(223, 181, 86, 0.4);
 }
 
 [data-theme="bcso-emerald"] {
@@ -40,6 +46,178 @@
 
 .mono {
   font-family: 'Orbitron', 'JetBrains Mono', monospace;
+}
+
+/* BANDEAU SUPÉRIEUR OFFICIEL LSPD / GOUVERNEMENT SAN ANDREAS */
+#lspd-top-ribbon {
+  height: 30px;
+  background: #03070e;
+  border-bottom: 1px solid #162a47;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  font-size: 11px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+}
+
+#lspd-top-ribbon::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #1d4ed8 0%, #38bdf8 35%, #dfb556 50%, #3b82f6 65%, #1d4ed8 100%);
+}
+
+.lspd-ribbon-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  color: #cbd5e1;
+  letter-spacing: 0.08em;
+}
+
+.lspd-ribbon-center {
+  color: var(--gold-seal);
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  background: rgba(223, 181, 86, 0.09);
+  padding: 2px 10px;
+  border: 1px solid rgba(223, 181, 86, 0.3);
+  border-radius: 3px;
+}
+
+.lspd-ribbon-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+}
+
+.live-green-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  display: inline-block;
+}
+
+/* Ajustement layout avec le bandeau supérieur de 30px */
+.app {
+  padding-top: 30px;
+}
+
+.sidebar {
+  top: 30px !important;
+  background: linear-gradient(180deg, #070f1e 0%, #050a14 100%) !important;
+  border-right: 1px solid #1b3358 !important;
+}
+
+.topbar {
+  top: 30px !important;
+  background: rgba(9, 19, 36, 0.95) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #1b3358 !important;
+}
+
+/* SCEAU OFFICIEL LSPD DANS LA SIDEBAR */
+.lspd-seal-header {
+  padding: 18px 16px;
+  border-bottom: 1px solid #1b3358;
+  background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.16), transparent 75%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lspd-seal-titles h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 1.5px;
+  line-height: 1.1;
+  text-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
+}
+
+.lspd-seal-titles p {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gold-seal);
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.lspd-nav-section-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  color: var(--gold-seal);
+  padding: 14px 20px 5px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.nav-item {
+  padding: 11px 20px !important;
+  font-size: 15px !important;
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.04) 100%) !important;
+  border-left: 3px solid var(--gold-seal) !important;
+  color: #ffffff !important;
+}
+
+.nav-item.active i {
+  color: var(--gold-seal) !important;
+}
+
+/* FICHE MATRICULE AGENT EN BAS DE LA SIDEBAR */
+.lspd-agent-credential {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #0a1528;
+  border: 1px solid #1e3860;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: border-color 0.2s;
+}
+
+.lspd-agent-credential:hover {
+  border-color: var(--gold-seal);
+}
+
+.lspd-badge-monogram {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  background: rgba(223, 181, 86, 0.14);
+  border: 1.5px solid var(--gold-seal);
+  color: var(--gold-seal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', monospace;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* Badges de catégories pénales */
@@ -104,7 +282,7 @@
 }
 
 .agg-chip.selected {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.22);
   border-color: var(--accent);
   color: #ffffff;
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
@@ -150,7 +328,7 @@
   color: var(--blue);
 }
 
-/* Cartes des 5 Paliers (MIN 1, MIN 2, NOMINALE, AGGRAVÉ, MAXIMAL) en Bleu LSPD */
+/* Cartes des 5 Paliers (MIN 1, MIN 2, NOMINALE, AGGRAVÉ, MAXIMAL) */
 .palier-card {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
@@ -170,8 +348,8 @@
 }
 
 .palier-card.active {
-  border-color: var(--accent);
-  background: rgba(59, 130, 246, 0.16);
+  border-color: var(--gold-seal);
+  background: rgba(59, 130, 246, 0.18);
   box-shadow: 0 0 16px rgba(59, 130, 246, 0.22);
 }
 
@@ -205,7 +383,7 @@
 }
 
 .mdt-table tr:hover td {
-  background: rgba(59, 130, 246, 0.05);
+  background: rgba(59, 130, 246, 0.06);
   color: var(--text-primary);
 }
 
@@ -220,9 +398,9 @@
 }
 
 .role-badge.patron {
-  background: rgba(59, 130, 246, 0.16);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(223, 181, 86, 0.14);
+  color: var(--gold-seal);
+  border: 1px solid rgba(223, 181, 86, 0.38);
 }
 
 .alert-banner {

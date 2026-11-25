@@ -20,23 +20,23 @@ export default function DashboardAndHistoryView({
       {mode === "dashboard" && (
         <>
           <div className="stats-grid">
+            <div className="stat-card" onClick={() => onNavigate("investigations")} style={{ cursor: "pointer" }}>
+              <div className="stat-icon blue">
+                <i className="fas fa-user-secret"></i>
+              </div>
+              <div className="stat-info">
+                <h3>Detective Bureau & Templates</h3>
+                <div className="stat-value">8 Templates</div>
+              </div>
+            </div>
+
             <div className="stat-card" onClick={() => onNavigate("penal-table")} style={{ cursor: "pointer" }}>
-              <div className="stat-icon red">
+              <div className="stat-icon orange">
                 <i className="fas fa-scale-balanced"></i>
               </div>
               <div className="stat-info">
                 <h3>Infractions & Aggravantes</h3>
                 <div className="stat-value">{infractions.length} / {aggravantes.length}</div>
-              </div>
-            </div>
-
-            <div className="stat-card" onClick={() => onNavigate("history")} style={{ cursor: "pointer" }}>
-              <div className="stat-icon blue">
-                <i className="fas fa-folder-open"></i>
-              </div>
-              <div className="stat-info">
-                <h3>Dossiers Enregistrés</h3>
-                <div className="stat-value">{history.length}</div>
               </div>
             </div>
 
@@ -51,7 +51,7 @@ export default function DashboardAndHistoryView({
             </div>
 
             <div className="stat-card">
-              <div className="stat-icon orange">
+              <div className="stat-icon blue">
                 <i className="fas fa-clock"></i>
               </div>
               <div className="stat-info">
@@ -64,14 +64,27 @@ export default function DashboardAndHistoryView({
           <div className="catalogue-grid">
             <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("calculator")}>
               <div className="weapon-card-top">
-                <div className="weapon-name">Calculateur de Peines</div>
-                <span className="weapon-badge badge-fusil">Action</span>
+                <div className="weapon-name">Calculateur de Peines & Rapport</div>
+                <span className="weapon-badge badge-pistolet">MDT</span>
               </div>
               <div className="weapon-desc">
-                Calculer les amendes, peines, circonstances aggravantes, paliers MIN 1 à MAXIMAL et générer les droits Miranda.
+                Calculer les amendes, peines, circonstances aggravantes, paliers MIN 1 à MAXIMAL, générer l'image PNG et le Rapport d'Arrestation LSPD.
               </div>
               <button className="btn btn-primary btn-sm">
-                <i className="fas fa-plus-circle"></i> Ouvrir le calculateur
+                <i className="fas fa-calculator"></i> Ouvrir le calculateur
+              </button>
+            </div>
+
+            <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("investigations")}>
+              <div className="weapon-card-top">
+                <div className="weapon-name">Dossiers d'Enquête & Templates</div>
+                <span className="weapon-badge badge-sniper">Detective Bureau</span>
+              </div>
+              <div className="weapon-desc">
+                Gérer les dossiers d'enquête LSPD (suspects, preuves, scellés) et utiliser les 8 templates officiels (Enquête, Interrogatoire, Mandat, BOLO, Plainte, Scellés).
+              </div>
+              <button className="btn btn-primary btn-sm">
+                <i className="fas fa-user-secret"></i> Voir les dossiers & templates
               </button>
             </div>
 
@@ -98,19 +111,6 @@ export default function DashboardAndHistoryView({
               </div>
               <button className="btn btn-outline btn-sm">
                 <i className="fas fa-gun"></i> Registre des armes
-              </button>
-            </div>
-
-            <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("settings")}>
-              <div className="weapon-card-top">
-                <div className="weapon-name">Formules & Réglages</div>
-                <span className="weapon-badge badge-sniper">Réglable</span>
-              </div>
-              <div className="weapon-desc">
-                Modifier les multiplicateurs (Tentative, Complicité, Avocat), les 5 paliers, les peines et consulter les formules du Sheet.
-              </div>
-              <button className="btn btn-outline btn-sm">
-                <i className="fas fa-sliders"></i> Configurer
               </button>
             </div>
           </div>
