@@ -25,8 +25,8 @@ export default function DashboardAndHistoryView({
                 <i className="fas fa-user-secret"></i>
               </div>
               <div className="stat-info">
-                <h3>Detective Bureau & Templates</h3>
-                <div className="stat-value">8 Templates</div>
+                <h3>Templates & Dossiers LSPD</h3>
+                <div className="stat-value">16 Templates</div>
               </div>
             </div>
 

@@ -1,392 +1,55 @@
 import React, { useState, useMemo } from "react";
+import { LSPD_TEMPLATES, LSPD_TEMPLATE_GROUPS } from "../data/lspdTemplates";
 
-export const LSPD_TEMPLATES = [
-  {
-    id: "tpl_enquete_criminelle",
-    title: "Dossier d'Enquête Criminelle (Detective Bureau)",
-    category: "Enquête DB",
-    icon: "user-secret",
-    badgeClass: "cat-crime",
-    description: "Modèle complet d'ouverture et de suivi d'enquête criminelle (homicide, crime organisé, trafic, grand banditisme).",
-    defaultPriority: "high",
-    defaultDivision: "Detective Bureau (Crimes & Homicides)",
-    generateContent: ({ caseNumber, title, agent, targetName, targetGroup, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — DETECTIVE BUREAU
-     DOSSIER D'ENQUÊTE CRIMINELLE N° : ${caseNumber || "LSPD-DB-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. IDENTIFICATION DU DOSSIER]
-• Intitulé de l'affaire        : ${title || "Opération / Enquête en cours"}
-• Date d'ouverture             : ${date} à ${heure}
-• Division en charge           : Detective Bureau — Los Santos Police Department
-• Détective directeur          : ${agent || "16 | Vance Winchester"}
-• Agents co-assignés           : À compléter
-• Niveau d'habilitation        : CONFIDENTIEL — LSPD / DOJ
-
-[2. CIBLES & PERSONNES D'INTÉRÊT]
-• Suspect principal identifié  : ${targetName || "Inconnu / Contre X"}
-• Affiliation / Organisation   : ${targetGroup || "Aucune affiliation confirmée"}
-• Secteur géographique         : ${location || "Los Santos"}
-• Dangerosité estimée          : Élevée (Susceptible d'être armé)
-
-[3. ORIGINE DE LA SAISINE & EXPOSÉ DES FAITS]
-En date du ${date}, le Detective Bureau du LSPD a ouvert une enquête officielle concernant les faits suivants :
-- Nature des infractions suspectées : [Préciser : Trafic d'armes / Homicide / Braquage / Blanchiment...]
-- Contexte initial : Lors d'une opération de patrouille / suite à un signalement / suite à une arrestation sur le secteur de ${location || "Los Santos"}, les éléments suivants ont été portés à la connaissance des enquêteurs :
-  1. [Élément factuel n°1]
-  2. [Élément factuel n°2]
-
-[4. ÉLÉMENTS DE PREUVE & SCELLÉS RÉUNIS]
-• Scellé #01 (Matériel / Armes) : [Ex: Douilles 9mm relevées sur place / Arme saisie]
-• Scellé #02 (Numérique / Photo): [Ex: Photographies de surveillance / Relevés téléphoniques]
-• Scellé #03 (Témoignages)      : [Ex: Déposition du témoin / Procès-verbal d'audition]
-
-[5. CHRONOLOGIE DES INVESTIGATIONS]
-• [${date} - ${heure}] : Ouverture officielle du dossier d'enquête et consignation des premiers scellés.
-• [À compléter]       : Surveillance / Audition / Demande de mandat.
-
-[6. RÉQUISITIONS & DEMANDES AU DEPARTMENT OF JUSTICE (DOJ)]
-• Mesure sollicitée            : [ ] Mandat de perquisition  [ ] Mandat d'arrêt  [ ] Mise sur écoute  [ ] Renvoi en procès
-• Synthèse de la cause probable: Les preuves matérielles et observations recueillies établissent une suspicion légitime et concordante justifiant la poursuite des investigations.
-
-Signé : ${agent || "16 | Vance Winchester"} — Detective Bureau, LSPD.`
-  },
-  {
-    id: "tpl_interrogatoire",
-    title: "Procès-Verbal d'Interrogatoire / Audition (Art. 131)",
-    category: "Interrogatoire",
-    icon: "comments",
-    badgeClass: "cat-delit-majeur",
-    description: "Template officiel de retranscription d'interrogatoire de suspect ou d'audition de témoin (Questions / Réponses & Droits Miranda).",
-    defaultPriority: "medium",
-    defaultDivision: "Detective Bureau / Patrouille",
-    generateContent: ({ caseNumber, title, agent, targetName, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — PROCÈS-VERBAL D'INTERROGATOIRE
-     RÉFÉRENCE PROCÉDURE : ${caseNumber || "LSPD-PV-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. CADRE DE L'AUDITION (ART. 131 CODE DE PROCÉDURE CRIMINELLE)]
-• Date & Heure de début        : ${date} à ${heure}
-• Heure de fin d'audition      : __:__
-• Lieu de l'audition           : Salle d'interrogatoire — Poste LSPD (${location || "Mission Row"})
-• Agent(s) interrogateur(s)    : ${agent || "16 | Vance Winchester"}
-• Magistrat présent (si applicable) : Procureur / Aucun
-
-[2. IDENTITÉ DE LA PERSONNE ENTENDUE]
-• Nom & Prénom                 : ${targetName || "Nom du suspect / témoin"}
-• Statut durant l'audition     : [X] Suspect en rétention judiciaire  [ ] Témoin  [ ] Victime
-• Notification Droits Miranda  : Notifiés et compris avant le début des questions
-• Assistance d'un Avocat       : [ ] Non (Renonce à son droit)  [ ] Oui (M° ________________)
-  (Note : Entretien confidentiel préalable de 10 min max accordé si avocat présent)
-
-[3. RETRANSCRIPTION DE L'INTERROGATOIRE (QUESTIONS / RÉPONSES)]
-• Question LSPD : Pouvez-vous décliner votre identité complète et nous expliquer votre présence sur le secteur de ${location || "Los Santos"} ?
-  ↳ Réponse de ${targetName || "l'individu"} : « [Retranscrire la déclaration] »
-
-• Question LSPD : [Question n°2 sur les faits reprochés / les objets saisis]
-  ↳ Réponse de ${targetName || "l'individu"} : « [Retranscrire la déclaration] »
-
-• Question LSPD : [Question n°3 sur d'éventuels complices ou commanditaires]
-  ↳ Réponse de ${targetName || "l'individu"} : « [Retranscrire la déclaration] »
-
-• Observations de l'Avocat (si présent) :
-  ↳ « [Aucune observation / Observation de la défense] »
-
-[4. CONCLUSION & ATTITUDE DURANT L'ENTRETIEN]
-• Comportement observé         : [Calme / Coopératif / Évasif / Hostile / Garde le silence]
-• Plaidoyer (si Délit Majeur)  : [ ] Plaide Coupable (Comparution immédiate)  [ ] Plaide Non Coupable
-
-Fait à Los Santos, le ${date}.
-Signé : ${agent || "16 | Vance Winchester"} — Los Santos Police Department.`
-  },
-  {
-    id: "tpl_mandat_perquisition",
-    title: "Demande de Mandat de Perquisition (Art. 151-160)",
-    category: "Mandat DOJ",
-    icon: "file-signature",
-    badgeClass: "cat-crime",
-    description: "Requête officielle adressée au Procureur et au Juge pour autoriser la perquisition d'un domicile, entrepôt ou véhicule.",
-    defaultPriority: "critical",
-    defaultDivision: "Detective Bureau / Command Staff",
-    generateContent: ({ caseNumber, title, agent, targetName, targetGroup, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     REQUÊTE AUX FINS DE MANDAT DE PERQUISITION — LSPD / DOJ
-     RÉFÉRENCE DOSSIER : ${caseNumber || "LSPD-MP-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-À L'ATTENTION DE :
-• Bureau du Procureur de San Andreas & Cour de Justice (Juge Fédéral / Juge d'État)
-
-[1. AGENT REQUÉRANT]
-• Nom, Grade & Matricule       : ${agent || "16 | Vance Winchester"}
-• Service                      : Los Santos Police Department
-• Date & Heure de la requête   : ${date} à ${heure}
-
-[2. PERSONNE & LIEUX VISÉS PAR LA PERQUISITION (ART. 154)]
-• Propriétaire / Occupant visé : ${targetName || "Nom du suspect"} ${targetGroup ? `(Affiliation : ${targetGroup})` : ""}
-• Désignation précise des lieux: ${location || "Adresse exacte du domicile / entrepôt / plaque du véhicule"}
-• Nature du bien               : [X] Domicile privé  [ ] Locaux commerciaux / Entreprise  [ ] Véhicule(s)
-
-[3. EXPOSÉ DE LA CAUSE PROBABLE (PROBABLE CAUSE)]
-Conformément à la Constitution de San Andreas et au Code de Procédure Criminelle, les éléments factuels suivants établissent l'existence d'indices graves et concordants :
-1. Faits reprochés : ${title || "Trafic d'armes / Stupéfiants / Recel / Association de malfaiteurs"}.
-2. Éléments matériels recueillis :
-   - [Détail de la filature, saisie préalable, témoignage sous serment ou flagrant délit]
-   - [Lien direct entre l'infraction et le lieu visé par la perquisition]
-
-[4. OBJETS & PREUVES RECHERCHÉS]
-La perquisition a pour objet exclusif la recherche et la saisie de :
-- Armes à feu illégales (Catégories A, B, C non déclarées), munitions et équipements tactiques ;
-- Substances stupéfiantes, matériel de conditionnement ou de production ;
-- Sommes d'argent issues d'activités illicites, documents comptables ou supports numériques.
-
-[5. MODALITÉS D'EXÉCUTION SOLLICITÉES]
-• Créneau d'exécution demandé  : Du ${date} au __/__/2026
-• Dispositif prévu             : Effectifs LSPD / Unité Tactique SWAT
-
-En foi de quoi, sollicitons la délivrance d'un Mandat de Perquisition officiel.
-Signé : ${agent || "16 | Vance Winchester"} — LSPD.`
-  },
-  {
-    id: "tpl_bolo_mandat_arret",
-    title: "Avis de Recherche (BOLO) & Mandat d'Arrêt",
-    category: "BOLO / Warrant",
-    icon: "bullseye",
-    badgeClass: "cat-delit-majeur",
-    description: "Diffusion d'un avis de recherche actif (Be On The Lookout) à toutes les unités LSPD pour un fugitif ou véhicule recherché.",
-    defaultPriority: "high",
-    defaultDivision: "Toutes Unités LSPD",
-    generateContent: ({ caseNumber, title, agent, targetName, targetGroup, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — AVIS DE RECHERCHE (BOLO)
-     N° D'ALERTE : ${caseNumber || "BOLO-2026-001"} • PRIORITÉ : HAUTE
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. INDIVIDU RECHERCHÉ]
-• Nom & Prénom                 : ${targetName || "Individu recherché"}
-• Surnom / Alias               : Inconnu
-• Groupe / Gang connu          : ${targetGroup || "Aucun / Indépendant"}
-• Dernière position connue     : ${location || "Los Santos"} (le ${date} à ${heure})
-
-[2. SIGNALEMENT & VÉHICULE(S)]
-• Description vestimentaire    : [Tenue, masque, signes distinctifs...]
-• Véhicule(s) utilisé(s)       : [Modèle, Couleur, Plaque d'immatriculation]
-
-[3. MOTIFS DE RECHERCHE & CHEFS D'ACCUSATION]
-• Affaire concernée            : ${title || "Délit de fuite / Fusillade / Braquage"}
-• Infractions reprochées       :
-  - [Chef d'accusation n°1]
-  - [Chef d'accusation n°2]
-
-[4. ÉVALUATION DES RISQUES & CONSIGNES AUX UNITÉS]
-• Niveau de menace             : [X] ARMÉ ET DANGEREUX — Approche avec précaution (Code 3 / Renforts requis)
-• Consignes d'intervention     : Procéder à l'interpellation immédiate, menottage, fouille de sécurité et transfert au poste LSPD. Contacter l'agent référent dès l'arrestation.
-
-Agent émetteur : ${agent || "16 | Vance Winchester"} — LSPD.`
-  },
-  {
-    id: "tpl_depot_plainte",
-    title: "Procès-Verbal de Dépôt de Plainte Citoyenne",
-    category: "Plainte",
-    icon: "file-lines",
-    badgeClass: "cat-delit-mineur",
-    description: "Enregistrement officiel de la plainte d'un citoyen ou d'une victime à l'accueil du commissariat LSPD.",
-    defaultPriority: "medium",
-    defaultDivision: "Patrouille / Accueil LSPD",
-    generateContent: ({ caseNumber, title, agent, targetName, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — DÉPÔT DE PLAINTE OFFICIEL
-     N° DE PLAINTE : ${caseNumber || "LSPD-PL-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. RÉCEPTION DE LA PLAINTE]
-• Date & Heure du dépôt        : ${date} à ${heure}
-• Agent récepteur              : ${agent || "16 | Vance Winchester"}
-• Qualification provisoire     : ${title || "Vol / Agression / Menaces / Dégradation"}
-
-[2. IDENTITÉ DU PLAIGNANT (VICTIME)]
-• Nom & Prénom du plaignant    : ________________________
-• Numéro de téléphone          : 555-______
-• Profession / Entreprise      : ________________________
-
-[3. PERSONNE(S) MISE(S) EN CAUSE]
-• Plainte déposée contre       : ${targetName || "Contre X (Auteur non identifié)"}
-• Signalement / Éléments fournis: [Description physique, véhicule, plaque, témoins...]
-• Lieu et heure des faits      : ${location || "Los Santos"}
-
-[4. DÉCLARATION DÉTAILLÉE DE LA VICTIME]
-« [Retranscrire le récit exact des faits rapportés par la victime : circonstances, déroulement, menaces ou violences subies...] »
-
-[5. PRÉJUDICE & PREUVES REMISES]
-• Préjudice matériel / financier: [Montant ou biens volés/dégradés]
-• Préjudice corporel (Certificat médical EMS) : [Aucun / Certificat médical joint]
-• Preuves remises au LSPD      : [Vidéo, captures SMS, témoignages...]
-
-Le plaignant certifie sur l'honneur l'exactitude de ses déclarations (rappel de l'Art. 304 Fausse alerte & Art. 312 Parjure).
-Signé : ${agent || "16 | Vance Winchester"} — LSPD.`
-  },
-  {
-    id: "tpl_saisie_scelles",
-    title: "Fiche de Saisie, Mise sous Scellés & Balistique (Art. 146)",
-    category: "Scellés",
-    icon: "boxes-stacked",
-    badgeClass: "cat-contravention",
-    description: "Inventaire officiel des armes, stupéfiants, équipements gouvernementaux ou véhicules placés sous scellés.",
-    defaultPriority: "medium",
-    defaultDivision: "Armurerie & Scellés LSPD",
-    generateContent: ({ caseNumber, title, agent, targetName, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — REGISTRE DES SCELLÉS (ART. 146)
-     BORDEREAU DE SAISIE N° : ${caseNumber || "LSPD-SC-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. TRAÇABILITÉ DE LA SAISIE]
-• Date & Heure de mise sous scellé : ${date} à ${heure}
-• Agent saisissant                 : ${agent || "16 | Vance Winchester"}
-• Lieu de la saisie                : ${location || "Poste de Police LSPD / Lieu d'intervention"}
-• Dossier / Prévenu rattaché       : ${targetName || "Non renseigné"} (${title || "Arrestation"})
-
-[2. INVENTAIRE DÉTAILLÉ DES PIÈCES À CONVICTION]
-1. ARMES & MUNITIONS :
-   • Désignation & Catégorie : [Ex: Pistolet Glock 19 (Cat. B1) / AK-47 (Cat. A1)]
-   • Numéro de série / Provenance : [Ex: Série illisible / Marché noir / Équipement Police]
-   • Munitions saisies : [Ex: 45x munitions 9mm]
-
-2. STUPÉFIANTS & PRODUITS ILLICITES :
-   • Nature du produit : [Ex: Cannabis / Cocaïne / Méthamphétamine]
-   • Quantité exacte (pochons) : [Ex: 24 pochons]
-
-3. AUTRES BIENS / ÉQUIPEMENTS / SOMMES D'ARGENT :
-   • Détail : [Ex: Argent sale / Gilet tactique / Véhicule mis en fourrière]
-
-[3. CHAÎNE DE GARDE & DESTINATION]
-• Destination du scellé : [X] Coffre des preuves LSPD  [ ] Destruction réglementaire  [ ] Pièce à conviction DOJ
-
-Certifié conforme par : ${agent || "16 | Vance Winchester"} — LSPD.`
-  },
-  {
-    id: "tpl_rapport_perquisition",
-    title: "Rapport d'Exécution de Mandat & Perquisition (Art. 163)",
-    category: "Exécution Mandat",
-    icon: "door-open",
-    badgeClass: "cat-crime",
-    description: "Compte-rendu obligatoire après l'exécution d'un mandat de perquisition ou d'arrêt à transmettre au Procureur et au Juge.",
-    defaultPriority: "high",
-    defaultDivision: "SWAT / Detective Bureau",
-    generateContent: ({ caseNumber, title, agent, targetName, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LOS SANTOS POLICE DEPARTMENT — RAPPORT D'EXÉCUTION DE MANDAT
-     CONFORME À L'ARTICLE 163 DU CODE DE PROCÉDURE CRIMINELLE
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. RÉFÉRENCES DU MANDAT EXÉCUTÉ]
-• Référence du rapport         : ${caseNumber || "LSPD-REM-2026-001"}
-• Nature du mandat             : [X] Mandat de Perquisition  [ ] Mandat d'Arrêt
-• Magistrat signataire         : Juge ________________ / Procureur ________________
-• Cible & Lieux visités        : ${targetName || "Cible"} — ${location || "Lieu perquisitionné"}
-
-[2. DÉROULEMENT DE L'OPÉRATION]
-• Date & Heure d'intervention  : Le ${date} à ${heure}
-• Responsable d'opération      : ${agent || "16 | Vance Winchester"}
-• Effectifs engagés            : [Liste des agents LSPD / SWAT présents]
-• Conditions d'entrée          : [Ouverture volontaire / Effraction tactique nécessaire]
-• Personnes présentes sur place: ${targetName || "Aucune personne présente / Individus interpellés"}
-
-[3. BILAN DES SAISIES EFFECTUÉES SUR PLACE]
-• Scellés constitués lors de la perquisition :
-  - [Scellé #1 : Description précise et quantité]
-  - [Scellé #2 : Description précise et quantité]
-• Incidents éventuels          : [Aucun incident / Coups de feu / Dégradations]
-
-Transmission officielle au Bureau du Procureur et au Juge pour contrôle de régularité.
-Signé : ${agent || "16 | Vance Winchester"} — LSPD.`
-  },
-  {
-    id: "tpl_surveillance_gang",
-    title: "Rapport de Filature & Renseignement Gang (GND)",
-    category: "Renseignement GND",
-    icon: "binoculars",
-    badgeClass: "cat-delit-majeur",
-    description: "Fiche de renseignement sur une organisation criminelle ou un gang (membres, véhicules, territoire, activités illégales).",
-    defaultPriority: "medium",
-    defaultDivision: "Gang & Narcotics Division (GND)",
-    generateContent: ({ caseNumber, title, agent, targetName, targetGroup, location, date, heure }) =>
-`╔══════════════════════════════════════════════════════════════════╗
-     LSPD — GANG & NARCOTICS DIVISION (GND) — FICHE RENSEIGNEMENT
-     RAPPORT DE SURVEILLANCE N° : ${caseNumber || "LSPD-GND-2026-001"}
-╚══════════════════════════════════════════════════════════════════╝
-
-[1. ORGANISATION / GROUPE SURVEILLÉ]
-• Nom du Groupe / Gang         : ${targetGroup || title || "Organisation sous surveillance"}
-• Secteur / Quartier d'influence: ${location || "Los Santos"}
-• Couleurs / Signes distinctifs: [Tenue, tatouages, signes de ralliement]
-• Date & Heure d'observation   : ${date} à ${heure}
-• Agent(s) observateur(s)      : ${agent || "16 | Vance Winchester"}
-
-[2. MEMBRES IDENTIFIÉS & HIÉRARCHIE SUPPOSÉE]
-• Cible principale observée    : ${targetName || "Membre identifié"}
-• Autres individus repérés     : [Noms RP, alias, rôles observés]
-• Véhicules récurrents         : [Modèle, couleur, plaque d'immatriculation]
-
-[3. ACTIVITÉS ILLICITES OBSERVÉES]
-• Faits constatés lors de la filature :
-  - [Ex: Transactions de stupéfiants (Art. 802), port d'armes lourdes, rassemblement armé...]
-• Photographies / Preuves jointes : [Oui / Références photos]
-
-Signé : ${agent || "16 | Vance Winchester"} — Gang & Narcotics Division, LSPD.`
-  }
-];
+export { LSPD_TEMPLATES };
 
 const INITIAL_SAMPLE_CASES = [
   {
     id: "case_sample_1",
-    caseNumber: "LSPD-DB-2026-014",
+    caseNumber: "LSPD-BRQ-2026-014",
     title: "Braquage Supérette Strawberry & Refus d'obtempérer",
-    templateId: "tpl_enquete_criminelle",
-    division: "Detective Bureau / Patrouille",
+    templateId: "tpl_braquage_superette",
+    division: "Patrouille / Intervention LSPD",
     status: "in_progress",
     priority: "high",
     leadAgent: "16 | Vance Winchester",
     targetName: "Mike Armstrong",
     targetGroup: "Indépendant",
-    location: "Strawberry Ave — Supérette n°4",
+    location: "Strawberry Ave — Supérette 24/7",
     createdAt: "25/11/2026 02:21",
     suspects: [
-      { name: "Mike Armstrong", status: "En garde à vue", role: "Auteur principal" }
+      { name: "Mike Armstrong", status: "En garde à vue", role: "Braqueur principal" }
     ],
     evidence: [
-      { code: "SC-01", label: "Vidéosurveillance de la supérette Strawberry" },
-      { code: "SC-02", label: "Rapport d'interpellation véhicule en fuite (Art. 301)" }
+      { code: "SC-01", label: "Vidéosurveillance de la supérette Strawberry (10-90)" },
+      { code: "SC-02", label: "Rapport de course-poursuite 10-80 (Art. 301)" }
     ],
     reportText: ""
   },
   {
     id: "case_sample_2",
-    caseNumber: "LSPD-GND-2026-008",
-    title: "Surveillance Trafic d'Armes Catégorie A & Stupéfiants",
-    templateId: "tpl_surveillance_gang",
-    division: "Gang & Narcotics Division (GND)",
+    caseNumber: "LSPD-FLC-2026-009",
+    title: "Braquage Banque Fleeca Hawick Ave — Équipe de 4 individus",
+    templateId: "tpl_braquage_banque_fleeca",
+    division: "Major Crimes / SWAT / LSPD",
     status: "warrant_needed",
     priority: "critical",
     leadAgent: "16 | Vance Winchester",
-    targetName: "Réseau Port de Los Santos",
+    targetName: "Équipe Fleeca (Suspects masqués)",
     targetGroup: "Organisation Criminelle",
-    location: "Docks de Los Santos — Entrepôt Sud",
+    location: "Hawick Ave — Banque Fleeca",
     createdAt: "24/11/2026 21:45",
     suspects: [
-      { name: "Suspect non identifié #1", status: "Sous surveillance", role: "Revendeur / Instigateur (Art. 802)" }
+      { name: "Suspect non identifié #1", status: "Recherché", role: "Négociateur / Armé Cat. B" }
     ],
     evidence: [
-      { code: "SC-01", label: "Clichés photographiques d'échanges de caisses d'armes Cat. A" },
-      { code: "SC-02", label: "Relevé de plaques d'immatriculation aux abords des Docks" }
+      { code: "SC-01", label: "Relevé de plaques véhicule de fuite (Sultan RS noire)" },
+      { code: "SC-02", label: "Déposition des 2 otages libérés (Examen EMS RAS)" }
     ],
     reportText: ""
   }
 ];
 
-// Populate initial sample cases reportText using their template
 INITIAL_SAMPLE_CASES.forEach(c => {
   const tpl = LSPD_TEMPLATES.find(t => t.id === c.templateId) || LSPD_TEMPLATES[0];
   const [d, h] = c.createdAt.split(" ");
@@ -416,9 +79,13 @@ const PRIORITY_BADGES = {
   medium:   { label: "Code 1 • Normale", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.14)" }
 };
 
-const STORAGE_CASES_KEY = "sa_lspd_investigations_v1";
+const STORAGE_CASES_KEY = "sa_lspd_investigations_v2";
 
-export default function InvestigationsView({ meta, onSendSuspectToCalculator }) {
+export default function InvestigationsView({
+  meta,
+  onSendSuspectToCalculator,
+  onLoadTemplatePresetToCalculator
+}) {
   const [cases, setCases] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_CASES_KEY);
@@ -429,18 +96,20 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
   });
 
   const [activeCaseId, setActiveCaseId] = useState(() => cases[0]?.id || null);
-  const [subView, setSubView] = useState("dossiers"); // "dossiers" | "templates"
+  const [subView, setSubView] = useState("templates"); // Open straight on Templates or Dossiers
+  const [templateGroupFilter, setTemplateGroupFilter] = useState("ALL");
+  const [templateSearch, setTemplateSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [copiedId, setCopiedId] = useState(null);
 
-  // New Case Modal / Form state
+  // New Case Modal state
   const [showNewModal, setShowNewModal] = useState(false);
   const [newForm, setNewForm] = useState({
     templateId: LSPD_TEMPLATES[0].id,
-    caseNumber: `LSPD-DB-2026-${String(Math.floor(100 + Math.random() * 899))}`,
+    caseNumber: `LSPD-BRQ-2026-${String(Math.floor(100 + Math.random() * 899))}`,
     title: "",
-    division: "Detective Bureau (Crimes & Homicides)",
+    division: "Patrouille / Intervention LSPD",
     status: "in_progress",
     priority: "high",
     targetName: "",
@@ -448,7 +117,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
     location: "Los Santos"
   });
 
-  // New Suspect / Evidence inline input
   const [newSuspectName, setNewSuspectName] = useState("");
   const [newSuspectStatus, setNewSuspectStatus] = useState("Recherché");
   const [newEvidenceLabel, setNewEvidenceLabel] = useState("");
@@ -465,6 +133,19 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
   const activeCase = useMemo(() => {
     return cases.find(c => c.id === activeCaseId) || cases[0] || null;
   }, [cases, activeCaseId]);
+
+  const filteredTemplates = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase();
+    return LSPD_TEMPLATES.filter(t => {
+      if (templateGroupFilter !== "ALL" && t.group !== templateGroupFilter) return false;
+      if (!q) return true;
+      return (
+        t.title.toLowerCase().includes(q) ||
+        t.category.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q)
+      );
+    });
+  }, [templateGroupFilter, templateSearch]);
 
   const filteredCases = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -502,7 +183,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
 
     const created = {
       id: `case_${Date.now()}`,
-      caseNumber: newForm.caseNumber || `LSPD-DB-2026-${Math.floor(100 + Math.random() * 899)}`,
+      caseNumber: newForm.caseNumber || `LSPD-2026-${Math.floor(100 + Math.random() * 899)}`,
       title: titleVal,
       templateId: tpl.id,
       division: newForm.division,
@@ -527,9 +208,9 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
     setSubView("dossiers");
     setNewForm({
       templateId: LSPD_TEMPLATES[0].id,
-      caseNumber: `LSPD-DB-2026-${String(Math.floor(100 + Math.random() * 899))}`,
+      caseNumber: `LSPD-BRQ-2026-${String(Math.floor(100 + Math.random() * 899))}`,
       title: "",
-      division: "Detective Bureau (Crimes & Homicides)",
+      division: "Patrouille / Intervention LSPD",
       status: "in_progress",
       priority: "high",
       targetName: "",
@@ -538,12 +219,11 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
     });
   };
 
-  // Create directly from a Template Card in 1 click
   const handleUseTemplate = (tpl) => {
     const now = new Date();
     const dateStr = now.toLocaleDateString("fr-FR");
     const heureStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    const num = `LSPD-${tpl.category.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
+    const num = `LSPD-${tpl.category.replace(/[^A-Z0-9]/gi, "").slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
 
     const generatedText = tpl.generateContent({
       caseNumber: num,
@@ -559,7 +239,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
     const created = {
       id: `case_${Date.now()}`,
       caseNumber: num,
-      title: `${tpl.title} — ${meta?.prevenu || "Nouveau Dossier"}`,
+      title: `${tpl.category} — ${meta?.prevenu || "Nouveau Dossier"}`,
       templateId: tpl.id,
       division: tpl.defaultDivision,
       status: "in_progress",
@@ -652,7 +332,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* TOP BAR: SWITCH BETWEEN DOSSIERS D'ENQUÊTE & BIBLIOTHÈQUE DE TEMPLATES LSPD */}
+      {/* TOP BAR */}
       <div className="card">
         <div
           className="card-header"
@@ -661,103 +341,142 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <button
               type="button"
-              className={`btn ${subView === "dossiers" ? "btn-primary" : "btn-outline"}`}
-              onClick={() => setSubView("dossiers")}
-            >
-              <i className="fas fa-folder-open"></i> Dossiers d'Enquête LSPD ({cases.length})
-            </button>
-            <button
-              type="button"
               className={`btn ${subView === "templates" ? "btn-primary" : "btn-outline"}`}
               onClick={() => setSubView("templates")}
             >
-              <i className="fas fa-file-signature"></i> Bibliothèque de Templates LSPD & DOJ ({LSPD_TEMPLATES.length})
+              <i className="fas fa-file-signature"></i> Templates Braquages, Interventions & Enquêtes ({LSPD_TEMPLATES.length})
+            </button>
+            <button
+              type="button"
+              className={`btn ${subView === "dossiers" ? "btn-primary" : "btn-outline"}`}
+              onClick={() => setSubView("dossiers")}
+            >
+              <i className="fas fa-folder-open"></i> Mes Dossiers d'Enquête LSPD ({cases.length})
             </button>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowNewModal(true)}
-            >
-              <i className="fas fa-plus-circle"></i> Nouveau Dossier d'Enquête
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowNewModal(true)}
+          >
+            <i className="fas fa-plus-circle"></i> Nouveau Dossier d'Enquête
+          </button>
         </div>
       </div>
 
-      {/* VIEW 1: BIBLIOTHÈQUE DES 8 TEMPLATES OFFICIELS LSPD / DOJ */}
+      {/* VIEW 1: BIBLIOTHÈQUE DES 16 TEMPLATES LSPD (BRAQUAGES, INTERVENTIONS, DB, MANDATS) */}
       {subView === "templates" && (
-        <div className="catalogue-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
-          {LSPD_TEMPLATES.map(tpl => {
-            const sampleText = tpl.generateContent({
-              caseNumber: "LSPD-2026-001",
-              title: tpl.title,
-              agent: meta?.agent || "16 | Vance Winchester",
-              targetName: meta?.prevenu || "Mike Armstrong",
-              targetGroup: "",
-              location: "Los Santos",
-              date: meta?.date || "25/11/2026",
-              heure: meta?.heure || "02:21"
-            });
-            return (
-              <div key={tpl.id} className="weapon-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div className="weapon-card-top">
-                  <div className="weapon-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <i className={`fas fa-${tpl.icon}`} style={{ color: "var(--accent)" }}></i>
-                    <span>{tpl.title}</span>
-                  </div>
-                  <span className={`cat-badge ${tpl.badgeClass}`}>{tpl.category}</span>
-                </div>
-
-                <p className="weapon-desc" style={{ marginBottom: 4 }}>
-                  {tpl.description}
-                </p>
-
-                <pre
-                  style={{
-                    background: "var(--bg-secondary)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: 10,
-                    fontSize: 11.5,
-                    color: "var(--text-secondary)",
-                    fontFamily: "'Rajdhani', sans-serif",
-                    maxHeight: 150,
-                    overflowY: "auto",
-                    whiteSpace: "pre-wrap"
-                  }}
-                >
-                  {sampleText}
-                </pre>
-
-                <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Filter bar */}
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                type="text"
+                className="input"
+                style={{ flex: "1 1 260px" }}
+                placeholder="Rechercher un template (ex: Braquage, Fleeca, Pacific, Supérette, Fusillade, Poursuite, Deal, Mandat)..."
+                value={templateSearch}
+                onChange={e => setTemplateSearch(e.target.value)}
+              />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {LSPD_TEMPLATE_GROUPS.map(g => (
                   <button
+                    key={g.id}
                     type="button"
-                    className="btn btn-primary btn-sm"
-                    style={{ flex: 1, justifyContent: "center" }}
-                    onClick={() => handleUseTemplate(tpl)}
+                    className={`btn btn-sm ${templateGroupFilter === g.id ? "btn-primary" : "btn-outline"}`}
+                    onClick={() => setTemplateGroupFilter(g.id)}
                   >
-                    <i className="fas fa-pen-to-square"></i> Ouvrir & Remplir ce Template
+                    {g.label}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => handleCopyText(tpl.id, sampleText)}
-                    title="Copier directement le modèle vierge"
-                  >
-                    <i className={`fas fa-${copiedId === tpl.id ? "check" : "copy"}`}></i>
-                    {copiedId === tpl.id ? "Copié" : "Copier"}
-                  </button>
-                </div>
+                ))}
               </div>
-            );
-          })}
+            </div>
+          </div>
+
+          <div className="catalogue-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
+            {filteredTemplates.map(tpl => {
+              const sampleText = tpl.generateContent({
+                caseNumber: "LSPD-2026-001",
+                title: tpl.title,
+                agent: meta?.agent || "16 | Vance Winchester",
+                targetName: meta?.prevenu || "Mike Armstrong",
+                targetGroup: "",
+                location: "Los Santos",
+                date: meta?.date || "25/11/2026",
+                heure: meta?.heure || "02:21"
+              });
+              return (
+                <div key={tpl.id} className="weapon-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="weapon-card-top">
+                    <div className="weapon-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <i className={`fas fa-${tpl.icon}`} style={{ color: "var(--accent)" }}></i>
+                      <span>{tpl.title}</span>
+                    </div>
+                    <span className={`cat-badge ${tpl.badgeClass}`}>{tpl.category}</span>
+                  </div>
+
+                  <p className="weapon-desc" style={{ marginBottom: 2 }}>
+                    {tpl.description}
+                  </p>
+
+                  <pre
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      padding: 10,
+                      fontSize: 11.5,
+                      color: "var(--text-secondary)",
+                      fontFamily: "'Rajdhani', sans-serif",
+                      maxHeight: 150,
+                      overflowY: "auto",
+                      whiteSpace: "pre-wrap"
+                    }}
+                  >
+                    {sampleText}
+                  </pre>
+
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: "auto" }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1, justifyContent: "center" }}
+                      onClick={() => handleUseTemplate(tpl)}
+                    >
+                      <i className="fas fa-pen-to-square"></i> Ouvrir & Modifier
+                    </button>
+
+                    {tpl.presetOffenses && onLoadTemplatePresetToCalculator && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+                        onClick={() => onLoadTemplatePresetToCalculator(tpl)}
+                        title="Charger automatiquement les amendes correspondantes + ce template dans le Calculateur"
+                      >
+                        <i className="fas fa-calculator"></i> Peines
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleCopyText(tpl.id, sampleText)}
+                      title="Copier le template dans le presse-papiers"
+                    >
+                      <i className={`fas fa-${copiedId === tpl.id ? "check" : "copy"}`}></i>
+                      {copiedId === tpl.id ? "Copié" : "Copier"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* VIEW 2: GESTIONNAIRE DES DOSSIERS D'ENQUÊTE + ÉDITEUR DE RAPPORT AVEC TEMPLATES */}
+      {/* VIEW 2: GESTIONNAIRE DES DOSSIERS D'ENQUÊTE + ÉDITEUR DE RAPPORT */}
       {subView === "dossiers" && (
         <div style={{ display: "grid", gridTemplateColumns: "370px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
           {/* LEFT LIST OF INVESTIGATION DOSSIERS */}
@@ -772,7 +491,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
               <input
                 type="text"
                 className="input"
-                placeholder="Rechercher N° dossier, suspect, gang, lieu..."
+                placeholder="Rechercher N° dossier, braquage, suspect, lieu..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -859,7 +578,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
           {/* RIGHT ACTIVE CASE WORKSPACE & EDITABLE TEMPLATE REPORT */}
           {activeCase ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {/* DOSSIER METADATA & STATUS CONTROLS */}
               <div className="card">
                 <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <h2>
@@ -870,7 +588,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => onSendSuspectToCalculator(activeCase.targetName)}
-                      title="Envoyer ce suspect dans le Calculateur de Peine"
                     >
                       <i className="fas fa-calculator"></i> Calculer la peine de {activeCase.targetName}
                     </button>
@@ -895,7 +612,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                       />
                     </div>
                     <div className="form-group" style={{ flex: 2 }}>
-                      <label>Intitulé de l'Affaire / Opération</label>
+                      <label>Intitulé de l'Affaire / Braquage / Opération</label>
                       <input
                         type="text"
                         value={activeCase.title}
@@ -933,7 +650,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                       />
                     </div>
                     <div className="form-group">
-                      <label>Lieu / Secteur</label>
+                      <label>Lieu / Établissement</label>
                       <input
                         type="text"
                         value={activeCase.location}
@@ -955,7 +672,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
 
                   {/* SUSPECTS & PREUVES / SCELLÉS */}
                   <div className="form-row" style={{ marginTop: 4 }}>
-                    {/* Suspects box */}
                     <div className="add-article-section" style={{ flex: 1, marginBottom: 0 }}>
                       <div className="add-article-title">
                         <i className="fas fa-users-viewfinder"></i> Personnes d'intérêt & Suspects ({(activeCase.suspects || []).length})
@@ -1009,7 +725,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                                 className="btn btn-sm btn-outline"
                                 style={{ padding: "2px 7px", fontSize: 11 }}
                                 onClick={() => onSendSuspectToCalculator(s.name)}
-                                title="Calculer sa peine"
                               >
                                 <i className="fas fa-gavel"></i> Peine
                               </button>
@@ -1027,7 +742,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                       </div>
                     </div>
 
-                    {/* Evidence / Scellés box */}
                     <div className="add-article-section" style={{ flex: 1, marginBottom: 0 }}>
                       <div className="add-article-title">
                         <i className="fas fa-boxes-stacked"></i> Preuves & Scellés rattachés ({(activeCase.evidence || []).length})
@@ -1037,7 +751,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                           type="text"
                           className="input"
                           style={{ padding: "6px 10px", fontSize: 13 }}
-                          placeholder="Ajouter une preuve, arme saisie, photo, témoignage..."
+                          placeholder="Ajouter une preuve, arme saisie, otage, photo..."
                           value={newEvidenceLabel}
                           onChange={e => setNewEvidenceLabel(e.target.value)}
                         />
@@ -1082,7 +796,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                 </div>
               </div>
 
-              {/* EDITABLE TEMPLATE REPORT FOR THIS DOSSIER */}
+              {/* EDITABLE TEMPLATE REPORT */}
               <div className="card">
                 <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <h2>
@@ -1092,7 +806,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <select
                       className="select"
-                      style={{ width: 260, padding: "5px 10px", fontSize: 13 }}
+                      style={{ width: 290, padding: "5px 10px", fontSize: 13 }}
                       value={activeCase.templateId || ""}
                       onChange={e => {
                         handleUpdateActiveCase("templateId", e.target.value);
@@ -1101,7 +815,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                     >
                       {LSPD_TEMPLATES.map(t => (
                         <option key={t.id} value={t.id}>
-                          Charger Template : {t.title}
+                          [{t.category}] {t.title}
                         </option>
                       ))}
                     </select>
@@ -1110,7 +824,6 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => handleApplyTemplateToActiveCase(activeCase.templateId || LSPD_TEMPLATES[0].id)}
-                      title="Actualiser le template avec les champs ci-dessus"
                     >
                       <i className="fas fa-arrows-rotate"></i> Actualiser Template
                     </button>
@@ -1149,7 +862,7 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
         </div>
       )}
 
-      {/* MODAL DE CRÉATION D'UN NOUVEAU DOSSIER D'ENQUÊTE AVEC CHOIX DU TEMPLATE */}
+      {/* MODAL CRÉATION DOSSIER */}
       {showNewModal && (
         <div
           style={{
@@ -1164,10 +877,10 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
           }}
           onClick={() => setShowNewModal(false)}
         >
-          <div className="card" style={{ maxWidth: 640, width: "100%" }} onClick={e => e.stopPropagation()}>
+          <div className="card" style={{ maxWidth: 660, width: "100%" }} onClick={e => e.stopPropagation()}>
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2>
-                <i className="fas fa-folder-plus"></i> Ouvrir un Nouveau Dossier d'Enquête LSPD
+                <i className="fas fa-folder-plus"></i> Ouvrir un Nouveau Dossier (Braquage, Enquête, Mandat...)
               </h2>
               <button className="btn btn-sm btn-outline" onClick={() => setShowNewModal(false)}>
                 Fermer
@@ -1208,10 +921,10 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
                     />
                   </div>
                   <div className="form-group" style={{ flex: 1.8 }}>
-                    <label>Intitulé de l'Enquête / Opération</label>
+                    <label>Intitulé de l'Affaire / Braquage</label>
                     <input
                       type="text"
-                      placeholder="Ex: Braquage Fleeca Hawick / Trafic Docks..."
+                      placeholder="Ex: Braquage Fleeca Hawick / Supérette Strawberry..."
                       value={newForm.title}
                       onChange={e => setNewForm(p => ({ ...p, title: e.target.value }))}
                       required
@@ -1242,10 +955,10 @@ export default function InvestigationsView({ meta, onSendSuspectToCalculator }) 
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Lieu / Secteur</label>
+                    <label>Lieu / Établissement</label>
                     <input
                       type="text"
-                      placeholder="Ex: Los Santos / Strawberry Ave"
+                      placeholder="Ex: Banque Fleeca / Supérette 24/7"
                       value={newForm.location}
                       onChange={e => setNewForm(p => ({ ...p, location: e.target.value }))}
                     />

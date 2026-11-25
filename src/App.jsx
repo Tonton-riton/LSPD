@@ -93,6 +93,7 @@ function getInitialSheetSampleRows(aggravantes) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("calculator");
+  const [activeReportTemplateId, setActiveReportTemplateId] = useState("standard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
@@ -330,6 +331,42 @@ export default function App() {
     showToast(`Suspect "${suspectName}" chargé dans le Calculateur de Peine`);
   };
 
+  const handleLoadTemplatePresetToCalculator = (tpl) => {
+    if (Array.isArray(tpl.presetOffenses) && tpl.presetOffenses.length > 0) {
+      const nextRows = tpl.presetOffenses
+        .map((preset, idx) => {
+          const inf = infractions.find(i => i.id === preset.infractionId);
+          if (!inf) return null;
+          let aggIds = [];
+          if (preset.aggKeyword) {
+            const matchedAgg = aggravantes.find(
+              a =>
+                a.idInfraction === inf.id &&
+                a.circonstance.toLowerCase().includes(preset.aggKeyword.toLowerCase())
+            );
+            if (matchedAgg) aggIds = [matchedAgg.uid];
+          }
+          return {
+            id: `preset_${Date.now()}_${idx}`,
+            infractionId: inf.id,
+            aggravanteIds: aggIds,
+            qte: 1,
+            tentative: false,
+            complicite: false,
+            avocat: false
+          };
+        })
+        .filter(Boolean);
+
+      if (nextRows.length > 0) {
+        setRows(nextRows);
+      }
+    }
+    setActiveReportTemplateId(tpl.id);
+    setActiveTab("calculator");
+    showToast(`Template "${tpl.category}" + amendes chargés dans le Calculateur !`);
+  };
+
   const agentParts = (meta.agent || "16 | Vance Winchester").split("|");
   const agentMatricule = agentParts.length > 1 ? agentParts[0].trim() : "16";
   const agentDisplayName = agentParts[agentParts.length - 1].trim() || "Vance Winchester";
@@ -540,6 +577,8 @@ export default function App() {
               onResetToSheetSample={handleResetToSheetSample}
               onOpenSettings={() => setActiveTab("settings")}
               onValidateAndArchive={handleValidateAndArchive}
+              activeReportTemplateId={activeReportTemplateId}
+              setActiveReportTemplateId={setActiveReportTemplateId}
             />
           )}
 
@@ -547,6 +586,7 @@ export default function App() {
             <InvestigationsView
               meta={meta}
               onSendSuspectToCalculator={handleSendSuspectToCalculator}
+              onLoadTemplatePresetToCalculator={handleLoadTemplatePresetToCalculator}
             />
           )}
 
