@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   formatCurrency,
   formatMinutesToHours,
@@ -74,8 +74,7 @@ export default function CalculatorView({
 
   const [copiedKey, setCopiedKey] = useState(null);
   const [inspectedInfraction, setInspectedInfraction] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
-  const [imageStatusMsg, setImageStatusMsg] = useState(null);
+  const [showPenaltyPrintModal, setShowPenaltyPrintModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   const infractionsMap = useMemo(() => new Map(infractions.map(i => [i.id, i])), [infractions]);
@@ -395,61 +394,24 @@ export default function CalculatorView({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // Generate PNG image of all fines
-  const handleOpenImagePreview = () => {
-    const canvas = generatePenaltyCanvas({
-      meta,
-      serial,
-      summary,
-      activePalier,
-      config,
-      notes
-    });
-    setImagePreviewUrl(canvas.toDataURL("image/png"));
+  // Ouvre la Fiche de Peines & Amendes au format Feuille Papier A4 Officielle LSPD (.PNG + Lien Imprimante FiveM)
+  const handleCopyImageToClipboard = () => {
+    setShowPenaltyPrintModal(true);
   };
 
-  const handleCopyImageToClipboard = async () => {
-    const canvas = generatePenaltyCanvas({
-      meta,
-      serial,
-      summary,
-      activePalier,
-      config,
-      notes
-    });
-    const dataUrl = canvas.toDataURL("image/png");
-    setImagePreviewUrl(dataUrl);
-
-    try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-      if (blob && navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
-        setImageStatusMsg("Image copiée dans le presse-papiers ! Faites Ctrl+V sur Discord.");
-      } else {
-        setImageStatusMsg("Aperçu généré ! Cliquez sur Télécharger PNG ou clic-droit > Copier l'image.");
-      }
-    } catch {
-      setImageStatusMsg("Aperçu généré ! Faites clic-droit sur l'image > Copier l'image, ou cliquez sur Télécharger PNG.");
-    }
-    setTimeout(() => setImageStatusMsg(null), 4000);
-  };
-
-  const handleDownloadImagePng = () => {
-    const canvas = generatePenaltyCanvas({
-      meta,
-      serial,
-      summary,
-      activePalier,
-      config,
-      notes
-    });
-    const url = canvas.toDataURL("image/png");
-    const safeName = (meta.prevenu || "Dossier").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Amendes_${safeName}_${serial || "LSPD"}.png`;
-    a.click();
-  };
+  const renderPenaltyPaperCanvas = useCallback(
+    ({ signingAgent, commandVisa, docNumber }) =>
+      generatePenaltyCanvas({
+        meta: { ...meta, agent: signingAgent },
+        serial: docNumber,
+        commandVisa,
+        summary,
+        activePalier,
+        config,
+        notes
+      }),
+    [meta, summary, activePalier, config, notes]
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1344,60 +1306,29 @@ export default function CalculatorView({
         </div>
       </div>
 
-      {/* MODAL APERÇU & EXPORT DE L'IMAGE PNG DES AMENDES */}
-      {imagePreviewUrl && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.82)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20
-          }}
-          onClick={() => setImagePreviewUrl(null)}
-        >
-          <div
-            className="card"
-            style={{ maxWidth: 1020, width: "100%", maxHeight: "92vh", display: "flex", flexDirection: "column" }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-              <h2>
-                <i className="fas fa-camera"></i> Fiche Image Récapitulative des Amendes (.PNG)
-              </h2>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" className="btn btn-sm btn-primary" onClick={handleCopyImageToClipboard}>
-                  <i className="fas fa-copy"></i> Copier l'image (Ctrl+V Discord)
-                </button>
-                <button type="button" className="btn btn-sm btn-success" onClick={handleDownloadImagePng}>
-                  <i className="fas fa-download"></i> Télécharger .PNG
-                </button>
-                <button type="button" className="btn btn-sm btn-outline" onClick={() => setImagePreviewUrl(null)}>
-                  Fermer
-                </button>
-              </div>
-            </div>
-
-            {imageStatusMsg && (
-              <div style={{ padding: "10px 20px", background: "var(--green-bg)", color: "var(--green)", fontWeight: 700, fontSize: 14, borderBottom: "1px solid var(--border)" }}>
-                <i className="fas fa-circle-check" style={{ marginRight: 8 }}></i>
-                {imageStatusMsg}
-              </div>
-            )}
-
-            <div className="card-body" style={{ overflowY: "auto", textAlign: "center", background: "#050912" }}>
-              <img
-                src={imagePreviewUrl}
-                alt="Fiche récapitulative des amendes"
-                style={{ maxWidth: "100%", height: "auto", borderRadius: 10, border: "1px solid var(--border)" }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL FICHE DE PEINES & AMENDES AU FORMAT PAPIER A4 OFFICIEL LSPD (.PNG + LIEN IMPRIMANTE FIVEM) */}
+      <PrintReportModal
+        isOpen={showPenaltyPrintModal}
+        onClose={() => setShowPenaltyPrintModal(false)}
+        modalTitle="Fiche de Peines & Amendes Officielle LSPD (Format Papier A4 .PNG / Imprimable en jeu)"
+        downloadPrefix="Fiche_Peines_LSPD"
+        title="FICHE OFFICIELLE DE CALCUL DES PEINES & AMENDES"
+        docNumber={serial || "LSPD-RA-2026"}
+        date={meta.date}
+        agent={meta.agent}
+        prevenu={meta.prevenu}
+        renderCustomCanvas={renderPenaltyPaperCanvas}
+        autoCopyOnOpen={true}
+        onSaveChanges={({ agent: nextAgent, docNumber: nextDoc }) => {
+          if (nextAgent !== undefined) {
+            setMeta(p => ({ ...p, agent: nextAgent }));
+            setEditedReportText(prev => syncSigningAgentInText(prev, nextAgent));
+          }
+          if (nextDoc !== undefined) {
+            setSerial(nextDoc);
+          }
+        }}
+      />
 
       {/* MODAL IMPRESSION PAPIER EN JEU (FEUILLE A4 LSPD + LIEN DIRECT IMPRIMANTE FIVEM) */}
       <PrintReportModal

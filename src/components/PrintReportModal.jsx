@@ -8,6 +8,8 @@ import {
 export default function PrintReportModal({
   isOpen,
   onClose,
+  modalTitle = "Imprimer le Rapport en Jeu (Feuille Papier Officielle LSPD)",
+  downloadPrefix = "Feuille_LSPD",
   title,
   docNumber,
   date,
@@ -15,6 +17,8 @@ export default function PrintReportModal({
   initialCommandVisa = "",
   prevenu,
   reportText,
+  renderCustomCanvas,
+  autoCopyOnOpen = false,
   onSaveChanges
 }) {
   const [signingAgent, setSigningAgent] = useState(agent || "16 | Vance Winchester");
@@ -27,6 +31,7 @@ export default function PrintReportModal({
   const [statusMsg, setStatusMsg] = useState(null);
   const [savedIndicator, setSavedIndicator] = useState(false);
   const wasOpenRef = useRef(false);
+  const didAutoCopyRef = useRef(false);
 
   // Synchronise les champs UNIQUEMENT à l'ouverture de la modale (sans écraser pendant la saisie)
   useEffect(() => {
@@ -35,9 +40,15 @@ export default function PrintReportModal({
       setEditableDocNumber(docNumber || "LSPD-2026-001");
       setCommandVisa(initialCommandVisa || "");
       setSavedIndicator(false);
+      didAutoCopyRef.current = false;
     }
     wasOpenRef.current = isOpen;
   }, [isOpen, agent, docNumber, initialCommandVisa]);
+
+  const showStatus = useCallback((msg) => {
+    setStatusMsg(msg);
+    setTimeout(() => setStatusMsg(null), 4000);
+  }, []);
 
   const uploadToPrinterEndpoint = useCallback(async (urlData, docRef) => {
     if (!window.location.protocol.startsWith("http")) return;
@@ -68,20 +79,44 @@ export default function PrintReportModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const adjustedText = syncSigningAgentInText(reportText, signingAgent);
+    let canvas;
+    if (typeof renderCustomCanvas === "function") {
+      canvas = renderCustomCanvas({
+        signingAgent,
+        commandVisa,
+        docNumber: editableDocNumber
+      });
+    } else {
+      const adjustedText = syncSigningAgentInText(reportText, signingAgent);
+      canvas = generatePrintablePaperCanvas({
+        title,
+        docNumber: editableDocNumber,
+        date,
+        agent: signingAgent,
+        commandVisa,
+        prevenu,
+        reportText: adjustedText
+      });
+    }
 
-    const canvas = generatePrintablePaperCanvas({
-      title,
-      docNumber: editableDocNumber,
-      date,
-      agent: signingAgent,
-      commandVisa,
-      prevenu,
-      reportText: adjustedText
-    });
     const url = canvas.toDataURL("image/png");
     setCanvasRef(canvas);
     setDataUrl(url);
+
+    // Copie automatique optionnelle à l'ouverture (ex: bouton "Générer & Copier l'Image des Amendes")
+    if (autoCopyOnOpen && !didAutoCopyRef.current) {
+      didAutoCopyRef.current = true;
+      canvas.toBlob(async blob => {
+        try {
+          if (blob && navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
+            showStatus("Feuille A4 copiée dans le presse-papiers ! Collez sur Discord (Ctrl+V) ou utilisez le lien d'imprimante FiveM.");
+          }
+        } catch {
+          // ignore if browser blocks automatic clipboard write
+        }
+      }, "image/png");
+    }
 
     // Debounce l'upload vers /api/print-image quand l'utilisateur tape le nom du signataire
     const timer = setTimeout(() => {
@@ -98,6 +133,9 @@ export default function PrintReportModal({
     commandVisa,
     prevenu,
     reportText,
+    renderCustomCanvas,
+    autoCopyOnOpen,
+    showStatus,
     uploadToPrinterEndpoint
   ]);
 
@@ -109,7 +147,7 @@ export default function PrintReportModal({
       agent: nextAgent,
       commandVisa: nextVisa,
       docNumber: nextDocNum,
-      reportText: syncSigningAgentInText(reportText, nextAgent)
+      reportText: reportText ? syncSigningAgentInText(reportText, nextAgent) : undefined
     });
     setSavedIndicator(true);
   };
@@ -127,11 +165,6 @@ export default function PrintReportModal({
   const handleDocNumberChange = (val) => {
     setEditableDocNumber(val);
     notifyParentSave(signingAgent, commandVisa, val);
-  };
-
-  const showStatus = (msg) => {
-    setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(null), 4000);
   };
 
   const handleCopyUrl = () => {
@@ -157,17 +190,17 @@ export default function PrintReportModal({
 
   const handleDownloadPng = () => {
     if (!dataUrl) return;
-    const safeName = (editableDocNumber || prevenu || "Rapport_LSPD").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeName = (editableDocNumber || prevenu || "Document_LSPD").replace(/[^a-zA-Z0-9_-]/g, "_");
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = `Feuille_LSPD_${safeName}.png`;
+    a.download = `${downloadPrefix}_${safeName}.png`;
     a.click();
     showStatus("Feuille papier LSPD téléchargée en .PNG !");
   };
 
   const handleBrowserPrint = () => {
     if (!dataUrl) return;
-    triggerBrowserPrint(dataUrl, `Rapport LSPD — ${editableDocNumber || ""}`);
+    triggerBrowserPrint(dataUrl, `${downloadPrefix} — ${editableDocNumber || ""}`);
   };
 
   return (
@@ -196,7 +229,7 @@ export default function PrintReportModal({
           style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}
         >
           <h2>
-            <i className="fas fa-print" style={{ color: "var(--gold-seal)" }}></i> Imprimer le Rapport en Jeu (Feuille Papier Officielle LSPD)
+            <i className="fas fa-print" style={{ color: "var(--gold-seal)" }}></i> {modalTitle}
           </h2>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn btn-sm btn-primary" onClick={handleCopyImage}>
@@ -240,7 +273,7 @@ export default function PrintReportModal({
             >
               <span>
                 <i className="fas fa-signature" style={{ marginRight: 5 }}></i>
-                Agent qui signe le rapport (Modifiable)
+                Agent qui signe le document (Modifiable)
               </span>
               {onSaveChanges && savedIndicator && (
                 <span style={{ color: "var(--green)", fontSize: 10.5 }}>

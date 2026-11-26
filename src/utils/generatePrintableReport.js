@@ -47,7 +47,7 @@ function wrapLines(ctx, text, maxWidth) {
   return result;
 }
 
-function drawLspdBadge(ctx, cx, cy, r) {
+export function drawLspdBadge(ctx, cx, cy, r) {
   ctx.save();
   // Outer gold ring
   ctx.beginPath();
@@ -101,7 +101,7 @@ function drawLspdBadge(ctx, cx, cy, r) {
   ctx.restore();
 }
 
-function drawInkStamp(ctx, cx, cy, dateStr, refStr) {
+export function drawInkStamp(ctx, cx, cy, dateStr, refStr) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate((-7 * Math.PI) / 180);
