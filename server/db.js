@@ -545,6 +545,53 @@ export async function saveReport(data, authorUser) {
   }
 }
 
+export function applyDojDecisionToText(text, { status, reviewerName, comment, reviewedAt }) {
+  let out = String(text || '');
+  const who = reviewerName || 'Magistrat DOJ';
+  const when = reviewedAt || new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+  const obsText = comment
+    ? `${comment} — (${who}, le ${when})`
+    : status === 'approved'
+    ? `Approuvé conforme par ${who} le ${when}.`
+    : status === 'changes_requested'
+    ? `Complément requis par ${who} le ${when}.`
+    : `Refusé par ${who} le ${when}.`;
+
+  // Coche automatiquement la bonne case sur la ligne "• Décision..." / "• Suite DOJ..." / "• Réception DOJ..."
+  out = out.replace(
+    /^([•\-]\s*(?:Décision(?:\s+DOJ)?|Suite DOJ|Réception DOJ)\s*:\s*)(.+)$/gim,
+    (fullLine, prefix, rest) => {
+      // Remet toutes les cases de cette ligne à [ ] d'abord
+      let clean = rest.replace(/\[[xX✓✔]\]/g, '[ ]');
+      if (status === 'approved') {
+        clean = clean
+          .replace(/\[\s*\]\s*(MANDAT ACCORDÉ|MANDAT D'ARRÊT DÉLIVRÉ|ACCORDÉ(?!\s+AVEC|\s*\()|Poursuites engagées|Rapport vérifié)/i, '[X] $1');
+      } else if (status === 'changes_requested') {
+        if (/ACCORDÉ AVEC RÉSERVES|Enquête complémentaire/i.test(clean)) {
+          clean = clean.replace(/\[\s*\]\s*(ACCORDÉ AVEC RÉSERVES|Enquête complémentaire)/i, '[X] $1');
+        } else {
+          clean = `${clean.replace(/—\s*(?:Motif|Limites)\s*:\s*_+/i, '').trim()}  |  [X] COMPLÉMENT REQUIS`;
+        }
+      } else if (status === 'rejected') {
+        clean = clean.replace(/\[\s*\]\s*(REFUSÉ|Classement)/i, '[X] $1');
+      }
+      // Si la ligne contient "Motif : ___" ou "Limites : ___" sur la même ligne, on le remplit
+      clean = clean.replace(/((?:Motif|Limites)\s*:\s*)_+/i, `$1${obsText}`);
+      return `${prefix}${clean}`;
+    }
+  );
+
+  // Remplit la ligne "• Observations / Limites fixées : ____" (ou la met à jour si déjà remplie)
+  if (/^[•\-]\s*Observations\s*\/\s*Limites fixées\s*:/im.test(out)) {
+    out = out.replace(
+      /^([•\-]\s*Observations\s*\/\s*Limites fixées\s*:\s*)(.*)$/im,
+      `$1${obsText}`
+    );
+  }
+
+  return out;
+}
+
 export async function reviewReport(id, { dojStatus, dojComment, reviewerUser }) {
   const validDecisions = ['approved', 'changes_requested', 'rejected', 'submitted'];
   if (!validDecisions.includes(dojStatus)) {
@@ -556,6 +603,13 @@ export async function reviewReport(id, { dojStatus, dojComment, reviewerUser }) 
   const reviewerLabel = `${reviewerUser.rank ? reviewerUser.rank + ' ' : ''}${reviewerUser.fullName}`.trim();
   const reviewedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
   const nextVisa = dojStatus === 'approved' ? reviewerLabel : existing.commandVisa;
+  const cleanComment = String(dojComment || '').trim();
+  const updatedText = applyDojDecisionToText(existing.reportText, {
+    status: dojStatus,
+    reviewerName: reviewerLabel,
+    comment: cleanComment,
+    reviewedAt
+  });
 
   if (usePostgres) {
     const { rows } = await pool.query(
@@ -566,9 +620,10 @@ export async function reviewReport(id, { dojStatus, dojComment, reviewerUser }) 
         doj_reviewer_rank = $5,
         doj_reviewed_at = $6,
         command_visa = $7,
+        report_text = $8,
         updated_at = NOW()
        WHERE id = $1 RETURNING *`,
-      [id, dojStatus, String(dojComment || '').trim(), reviewerLabel, reviewerUser.rank || 'Magistrat DOJ', reviewedAt, nextVisa]
+      [id, dojStatus, cleanComment, reviewerLabel, reviewerUser.rank || 'Magistrat DOJ', reviewedAt, nextVisa, updatedText]
     );
     return rows[0] ? mapReportRow(rows[0]) : null;
   } else {
@@ -577,11 +632,12 @@ export async function reviewReport(id, { dojStatus, dojComment, reviewerUser }) 
     localStore.reports[idx] = {
       ...localStore.reports[idx],
       dojStatus,
-      dojComment: String(dojComment || '').trim(),
+      dojComment: cleanComment,
       dojReviewerName: reviewerLabel,
       dojReviewerRank: reviewerUser.rank || 'Magistrat DOJ',
       dojReviewedAt: reviewedAt,
       commandVisa: nextVisa,
+      reportText: updatedText,
       updatedAt: new Date().toISOString()
     };
     saveLocalStore();
@@ -743,6 +799,13 @@ export async function reviewDojRequest(id, { status, dojComment, reviewerUser })
   const reviewerLabel = `${reviewerUser.rank ? reviewerUser.rank + ' ' : ''}${reviewerUser.fullName}`.trim();
   const reviewedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
   const nextVisa = status === 'approved' ? reviewerLabel : existing.commandVisa;
+  const cleanComment = String(dojComment || '').trim();
+  const updatedText = applyDojDecisionToText(existing.reportText, {
+    status,
+    reviewerName: reviewerLabel,
+    comment: cleanComment,
+    reviewedAt
+  });
 
   if (usePostgres) {
     const { rows } = await pool.query(
@@ -753,9 +816,10 @@ export async function reviewDojRequest(id, { status, dojComment, reviewerUser })
         doj_reviewer_rank = $5,
         doj_reviewed_at = $6,
         command_visa = $7,
+        report_text = $8,
         updated_at = NOW()
        WHERE id = $1 RETURNING *`,
-      [id, status, String(dojComment || '').trim(), reviewerLabel, reviewerUser.rank || 'Magistrat DOJ', reviewedAt, nextVisa]
+      [id, status, cleanComment, reviewerLabel, reviewerUser.rank || 'Magistrat DOJ', reviewedAt, nextVisa, updatedText]
     );
     return rows[0] ? mapDojRow(rows[0]) : null;
   } else {
@@ -764,11 +828,12 @@ export async function reviewDojRequest(id, { status, dojComment, reviewerUser })
     localStore.dojRequests[idx] = {
       ...localStore.dojRequests[idx],
       status,
-      dojComment: String(dojComment || '').trim(),
+      dojComment: cleanComment,
       dojReviewerName: reviewerLabel,
       dojReviewerRank: reviewerUser.rank || 'Magistrat DOJ',
       dojReviewedAt: reviewedAt,
       commandVisa: nextVisa,
+      reportText: updatedText,
       updatedAt: new Date().toISOString()
     };
     saveLocalStore();

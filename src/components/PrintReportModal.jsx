@@ -23,6 +23,7 @@ export default function PrintReportModal({
   prevenu,
   reportText,
   exhibits = EMPTY_EXHIBITS,
+  dojDecision = null,
   stampTopText = "LSPD • SAN ANDREAS",
   stampMainText = "CERTIFIÉ CONFORME",
   statusLabel = "OFFICIEL LSPD",
@@ -67,6 +68,10 @@ export default function PrintReportModal({
       ])
     );
   }, [exhibits]);
+
+  const dojDecisionKey = dojDecision
+    ? `${dojDecision.status || ""}|${dojDecision.reviewerName || ""}|${dojDecision.comment || ""}|${dojDecision.reviewedAt || ""}`
+    : "";
 
   // Synchronise les champs UNIQUEMENT à l'ouverture de la modale (sans écraser pendant la saisie)
   useEffect(() => {
@@ -153,6 +158,7 @@ export default function PrintReportModal({
             reportText: adjustedText,
             exhibits: loadedExhibits,
             exhibitsOnly: exhibitPrintMode === "exhibits_only",
+            dojDecision,
             stampTopText,
             stampMainText,
             statusLabel
@@ -205,6 +211,7 @@ export default function PrintReportModal({
     prevenu,
     reportText,
     exhibitsKey,
+    dojDecisionKey,
     exhibitPrintMode,
     stampTopText,
     stampMainText,

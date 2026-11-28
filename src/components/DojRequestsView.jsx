@@ -1012,13 +1012,31 @@ export default function DojRequestsView({
                           docNumber: activeReq.requestNumber,
                           date: (activeReq.createdAt || "").split(" ")[0] || meta?.date,
                           agent: activeReq.leadAgent || meta?.agent,
-                          commandVisa: activeReq.commandVisa || "",
+                          commandVisa: activeReq.commandVisa || activeReq.dojReviewerName || "",
                           prevenu: activeReq.targetGroup
                             ? `${activeReq.targetName} (${activeReq.targetGroup})`
                             : activeReq.targetName,
                           reportText: activeReq.reportText,
                           exhibits: activeReq.exhibits || [],
-                          approved: activeReq.status === "approved",
+                          dojDecision: ["approved", "changes_requested", "rejected"].includes(activeReq.status)
+                            ? {
+                                status: activeReq.status,
+                                reviewerName: activeReq.dojReviewerName || activeReq.commandVisa || "Magistrat DOJ",
+                                comment: activeReq.dojComment || "",
+                                reviewedAt: activeReq.dojReviewedAt || ""
+                              }
+                            : null,
+                          stampTopText: activeReq.status === "approved" || activeReq.status === "rejected" || activeReq.status === "changes_requested"
+                            ? "DOJ • SAN ANDREAS"
+                            : "LSPD • REQUÊTE DOJ",
+                          stampMainText:
+                            activeReq.status === "approved"
+                              ? "MANDAT APPROUVÉ"
+                              : activeReq.status === "rejected"
+                              ? "MANDAT REFUSÉ"
+                              : activeReq.status === "changes_requested"
+                              ? "COMPLÉMENT REQUIS"
+                              : "DOSSIER JUDICIAIRE",
                           statusLabel: (DOJ_STATUS_BADGES[activeReq.status]?.label || "DOSSIER DOJ").toUpperCase()
                         })
                       }
@@ -1499,12 +1517,31 @@ export default function DojRequestsView({
                           docNumber: activeReq.requestNumber,
                           date: (activeReq.createdAt || "").split(" ")[0] || meta?.date,
                           agent: activeReq.leadAgent || meta?.agent,
-                          commandVisa: activeReq.commandVisa || "",
+                          commandVisa: activeReq.commandVisa || activeReq.dojReviewerName || "",
                           prevenu: activeReq.targetGroup
                             ? `${activeReq.targetName} (${activeReq.targetGroup})`
                             : activeReq.targetName,
                           reportText: activeReq.reportText,
                           exhibits: activeReq.exhibits || [],
+                          dojDecision: ["approved", "changes_requested", "rejected"].includes(activeReq.status)
+                            ? {
+                                status: activeReq.status,
+                                reviewerName: activeReq.dojReviewerName || activeReq.commandVisa || "Magistrat DOJ",
+                                comment: activeReq.dojComment || "",
+                                reviewedAt: activeReq.dojReviewedAt || ""
+                              }
+                            : null,
+                          stampTopText: activeReq.status === "approved" || activeReq.status === "rejected" || activeReq.status === "changes_requested"
+                            ? "DOJ • SAN ANDREAS"
+                            : "LSPD • REQUÊTE DOJ",
+                          stampMainText:
+                            activeReq.status === "approved"
+                              ? "MANDAT APPROUVÉ"
+                              : activeReq.status === "rejected"
+                              ? "MANDAT REFUSÉ"
+                              : activeReq.status === "changes_requested"
+                              ? "COMPLÉMENT REQUIS"
+                              : "DOSSIER JUDICIAIRE",
                           statusLabel: (DOJ_STATUS_BADGES[activeReq.status]?.label || "DOSSIER DOJ").toUpperCase()
                         })
                       }
@@ -1601,8 +1638,9 @@ export default function DojRequestsView({
         prevenu={printPayload?.prevenu}
         reportText={printPayload?.reportText}
         exhibits={printPayload?.exhibits || []}
-        stampTopText={printPayload?.approved ? "DOJ • SAN ANDREAS" : "LSPD • REQUÊTE DOJ"}
-        stampMainText={printPayload?.approved ? "MANDAT APPROUVÉ" : "DOSSIER JUDICIAIRE"}
+        dojDecision={printPayload?.dojDecision || null}
+        stampTopText={printPayload?.stampTopText || "LSPD • REQUÊTE DOJ"}
+        stampMainText={printPayload?.stampMainText || "DOSSIER JUDICIAIRE"}
         statusLabel={printPayload?.statusLabel || "REQUÊTE DOJ"}
         onSaveChanges={
           printPayload?.reqId

@@ -105,20 +105,40 @@ export function drawLspdWatermark(ctx, width, totalHeight) {
   ctx.restore();
 }
 
-export function drawInkStamp(ctx, cx, cy, dateStr, refStr, topText = "LSPD • SAN ANDREAS", mainText = "CERTIFIÉ CONFORME") {
+export function drawInkStamp(
+  ctx,
+  cx,
+  cy,
+  dateStr,
+  refStr,
+  topText = "LSPD • SAN ANDREAS",
+  mainText = "CERTIFIÉ CONFORME",
+  inkColor = null
+) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate((-7 * Math.PI) / 180);
-  ctx.globalAlpha = 0.78;
+  ctx.globalAlpha = 0.82;
 
-  // Double rectangle stamp in official LSPD ink blue
-  ctx.strokeStyle = "#1d4ed8";
+  const upperMain = String(mainText || "").toUpperCase();
+  const resolvedColor =
+    inkColor ||
+    (upperMain.includes("APPROUV") || upperMain.includes("VALID")
+      ? "#047857"
+      : upperMain.includes("REFUS")
+      ? "#b91c1c"
+      : upperMain.includes("COMPL")
+      ? "#b45309"
+      : "#1d4ed8");
+
+  // Double rectangle stamp in official LSPD / DOJ ink
+  ctx.strokeStyle = resolvedColor;
   ctx.lineWidth = 3;
-  ctx.strokeRect(-104, -34, 208, 68);
+  ctx.strokeRect(-108, -34, 216, 68);
   ctx.lineWidth = 1.2;
-  ctx.strokeRect(-98, -28, 196, 56);
+  ctx.strokeRect(-102, -28, 204, 56);
 
-  ctx.fillStyle = "#1d4ed8";
+  ctx.fillStyle = resolvedColor;
   ctx.textAlign = "center";
   ctx.font = "900 12.5px 'Orbitron', sans-serif";
   ctx.fillText(topText, 0, -9);
@@ -130,6 +150,59 @@ export function drawInkStamp(ctx, cx, cy, dateStr, refStr, topText = "LSPD • S
   ctx.fillText(`${dateStr || ""} — ${(refStr || "OFFICIEL").slice(0, 16)}`, 0, 23);
 
   ctx.restore();
+}
+
+/**
+ * Coche automatiquement la case de décision DOJ ([X] MANDAT ACCORDÉ / REFUSÉ / COMPLÉMENT)
+ * et remplit la ligne Observations / Limites fixées dans le texte du document.
+ */
+export function applyDojDecisionToReportText(text, dojDecision) {
+  if (!dojDecision || !["approved", "changes_requested", "rejected"].includes(dojDecision.status)) {
+    return String(text || "");
+  }
+  let out = String(text || "");
+  const { status, reviewerName, comment, reviewedAt } = dojDecision;
+  const who = reviewerName || "Magistrat DOJ";
+  const when = reviewedAt || new Date().toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+  const obsText = comment && comment.trim()
+    ? `${comment.trim()} — (${who}, le ${when})`
+    : status === "approved"
+    ? `Approuvé conforme par ${who} le ${when}.`
+    : status === "changes_requested"
+    ? `Complément requis par ${who} le ${when}.`
+    : `Refusé par ${who} le ${when}.`;
+
+  out = out.replace(
+    /^([•\-]\s*(?:Décision(?:\s+DOJ)?|Suite DOJ|Réception DOJ)\s*:\s*)(.+)$/gim,
+    (fullLine, prefix, rest) => {
+      let clean = rest.replace(/\[[xX✓✔]\]/g, "[ ]");
+      if (status === "approved") {
+        clean = clean.replace(
+          /\[\s*\]\s*(MANDAT ACCORDÉ|MANDAT D'ARRÊT DÉLIVRÉ|ACCORDÉ(?!\s+AVEC|\s*\()|Poursuites engagées|Rapport vérifié)/i,
+          "[X] $1"
+        );
+      } else if (status === "changes_requested") {
+        if (/ACCORDÉ AVEC RÉSERVES|Enquête complémentaire/i.test(clean)) {
+          clean = clean.replace(/\[\s*\]\s*(ACCORDÉ AVEC RÉSERVES|Enquête complémentaire)/i, "[X] $1");
+        } else {
+          clean = `${clean.replace(/—\s*(?:Motif|Limites)\s*:\s*_+/i, "").trim()}  |  [X] COMPLÉMENT REQUIS`;
+        }
+      } else if (status === "rejected") {
+        clean = clean.replace(/\[\s*\]\s*(REFUSÉ|Classement)/i, "[X] $1");
+      }
+      clean = clean.replace(/((?:Motif|Limites)\s*:\s*)_+/i, `$1${obsText}`);
+      return `${prefix}${clean}`;
+    }
+  );
+
+  if (/^[•\-]\s*Observations\s*\/\s*Limites fixées\s*:/im.test(out)) {
+    out = out.replace(
+      /^([•\-]\s*Observations\s*\/\s*Limites fixées\s*:\s*)(.*)$/im,
+      `$1${obsText}`
+    );
+  }
+
+  return out;
 }
 
 /**
@@ -173,6 +246,7 @@ export function generatePrintablePaperCanvas({
   reportText = "",
   exhibits = [],
   exhibitsOnly = false,
+  dojDecision = null,
   stampTopText = "LSPD • SAN ANDREAS",
   stampMainText = "CERTIFIÉ CONFORME",
   statusLabel = "OFFICIEL LSPD"
@@ -184,8 +258,24 @@ export function generatePrintablePaperCanvas({
 
   const todayStr = date || new Date().toLocaleDateString("fr-FR");
 
+  // 0. Prépare le texte : synchronise la décision DOJ (cases [X] & observations) + remplace le placeholder preuves si des preuves sont jointes
+  let preparedText = String(reportText || "").replace(/\r\n/g, "\n");
+  if (dojDecision) {
+    preparedText = applyDojDecisionToReportText(preparedText, dojDecision);
+  }
+  if (Array.isArray(exhibits) && exhibits.length > 0 && /Aucune pièce photographique ou scellé joint/i.test(preparedText)) {
+    const autoList = exhibits
+      .map(ex => {
+        const metaStr = [ex.source, ex.date].filter(Boolean).join(" — ");
+        const tag = ex.imageData || ex.imageUrl || ex.imageEl ? " [PHOTO ANNEXÉE]" : "";
+        return `• [${ex.code || "PIÈCE"}] ${ex.title || "Preuve jointe"}${metaStr ? ` (${metaStr})` : ""}${tag}${ex.description ? ` : ${ex.description}` : ""}`;
+      })
+      .join("\n");
+    preparedText = preparedText.replace(/^[•\-]\s*Aucune pièce photographique ou scellé joint[^\n]*$/im, autoList);
+  }
+
   // Parse reportText into clean structured paper blocks
-  const rawLines = exhibitsOnly ? [] : String(reportText || "").replace(/\r\n/g, "\n").split("\n");
+  const rawLines = exhibitsOnly ? [] : preparedText.split("\n");
   const blocks = [];
   let extractedSubtitle = title;
 
@@ -339,9 +429,26 @@ export function generatePrintablePaperCanvas({
     exhibitsHeight += 10;
   }
 
+  // Encadré officiel de Décision DOJ (affiché dès que le DOJ a validé, demandé un complément ou refusé)
+  const hasDojDecisionBox = Boolean(
+    dojDecision && ["approved", "changes_requested", "rejected"].includes(dojDecision.status)
+  );
+  let dojDecisionCommentLines = [];
+  let dojDecisionBoxHeight = 0;
+  if (hasDojDecisionBox) {
+    mCtx.font = "500 13.5px 'Inter', sans-serif";
+    const obsLabel = dojDecision.comment && dojDecision.comment.trim()
+      ? `Observations / Motif DOJ : ${dojDecision.comment.trim()}`
+      : dojDecision.status === "approved"
+      ? "Décision conforme aux dispositions du Code de Procédure Criminelle de San Andreas — Exécution autorisée."
+      : "";
+    dojDecisionCommentLines = obsLabel ? wrapLines(mCtx, obsLabel, contentWidth - 36) : [];
+    dojDecisionBoxHeight = 64 + (dojDecisionCommentLines.length > 0 ? dojDecisionCommentLines.length * 19 + 8 : 0) + 18;
+  }
+
   const headerHeight = 205;
   const footerHeight = 185;
-  const totalHeight = Math.max(1380, headerHeight + bodyHeight + exhibitsHeight + footerHeight);
+  const totalHeight = Math.max(1380, headerHeight + bodyHeight + dojDecisionBoxHeight + exhibitsHeight + footerHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(width * scale);
@@ -508,6 +615,48 @@ export function generatePrintablePaperCanvas({
     }
   }
 
+  // 3A-bis. Render Official DOJ Decision Box (si le DOJ a validé / demandé un complément / refusé)
+  if (hasDojDecisionBox) {
+    curY += 8;
+    const boxH = dojDecisionBoxHeight - 18;
+    const isApp = dojDecision.status === "approved";
+    const isChg = dojDecision.status === "changes_requested";
+    const palette = isApp
+      ? { bg: "#ecfdf5", border: "#047857", accent: "#047857", title: "✓  DÉCISION OFFICIELLE DU DOJ : APPROUVÉ / VALIDÉ" }
+      : isChg
+      ? { bg: "#fffbeb", border: "#b45309", accent: "#b45309", title: "⚠  DÉCISION OFFICIELLE DU DOJ : COMPLÉMENT REQUIS" }
+      : { bg: "#fef2f2", border: "#b91c1c", accent: "#b91c1c", title: "✗  DÉCISION OFFICIELLE DU DOJ : REFUSÉ" };
+
+    ctx.fillStyle = palette.bg;
+    ctx.fillRect(marginX, curY, contentWidth, boxH);
+    ctx.strokeStyle = palette.border;
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(marginX, curY, contentWidth, boxH);
+    ctx.fillStyle = palette.accent;
+    ctx.fillRect(marginX, curY, 6, boxH);
+
+    ctx.fillStyle = palette.accent;
+    ctx.font = "800 13.5px 'Inter', sans-serif";
+    ctx.fillText(palette.title, marginX + 18, curY + 23);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "700 12.5px 'JetBrains Mono', monospace";
+    const revLine = `MAGISTRAT / PROCUREUR : ${dojDecision.reviewerName || commandVisa || "DOJ San Andreas"}${
+      dojDecision.reviewedAt ? `   •   LE ${dojDecision.reviewedAt}` : ""
+    }`;
+    ctx.fillText(revLine, marginX + 18, curY + 45);
+
+    if (dojDecisionCommentLines.length > 0) {
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "500 13.5px 'Inter', sans-serif";
+      dojDecisionCommentLines.forEach((line, idx) => {
+        ctx.fillText(line, marginX + 18, curY + 67 + idx * 19);
+      });
+    }
+
+    curY += boxH + 14;
+  }
+
   // 3B. Render Attached Exhibits & Photo Proofs (Pièces à conviction / Preuves DOJ)
   if (validExhibits.length > 0) {
     curY += 10;
@@ -589,7 +738,9 @@ export function generatePrintablePaperCanvas({
           ctx.textAlign = "right";
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "600 10.5px 'Inter', sans-serif";
-          ctx.fillText([card.source, card.date].filter(Boolean).join(" • ").slice(0, 38), cx + photoCardW - 10, curY + 18);
+          const safeSource = (card.source || "").slice(0, 28);
+          const ribbonMeta = [safeSource, card.date].filter(Boolean).join(" • ");
+          ctx.fillText(ribbonMeta, cx + photoCardW - 10, curY + 18);
           ctx.textAlign = "left";
         }
 

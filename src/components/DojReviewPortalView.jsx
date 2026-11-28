@@ -387,8 +387,25 @@ export default function DojReviewPortalView({
                             prevenu: activeItem.prevenu,
                             reportText: activeItem.reportText,
                             exhibits: [],
-                            stampTopText: activeItem.dojStatus === "approved" ? "DOJ • SAN ANDREAS" : "LSPD • SAN ANDREAS",
-                            stampMainText: activeItem.dojStatus === "approved" ? "VALIDÉ PAR LE DOJ" : "EN ÉTUDE DOJ",
+                            dojDecision: ["approved", "changes_requested", "rejected"].includes(activeItem.dojStatus)
+                              ? {
+                                  status: activeItem.dojStatus,
+                                  reviewerName: activeItem.dojReviewerName || activeItem.commandVisa || "Magistrat DOJ",
+                                  comment: activeItem.dojComment || "",
+                                  reviewedAt: activeItem.dojReviewedAt || ""
+                                }
+                              : null,
+                            stampTopText: ["approved", "changes_requested", "rejected"].includes(activeItem.dojStatus)
+                              ? "DOJ • SAN ANDREAS"
+                              : "LSPD • SAN ANDREAS",
+                            stampMainText:
+                              activeItem.dojStatus === "approved"
+                                ? "VALIDÉ PAR LE DOJ"
+                                : activeItem.dojStatus === "rejected"
+                                ? "REFUSÉ PAR LE DOJ"
+                                : activeItem.dojStatus === "changes_requested"
+                                ? "COMPLÉMENT REQUIS"
+                                : "EN ÉTUDE DOJ",
                             statusLabel: activeItem.dojStatus === "approved" ? "VALIDÉ DOJ" : "TRANSMIS DOJ"
                           }
                         : {
@@ -396,14 +413,31 @@ export default function DojReviewPortalView({
                             docNumber: activeItem.requestNumber,
                             date: (activeItem.createdAt || "").split(" ")[0],
                             agent: activeItem.leadAgent,
-                            commandVisa: activeItem.commandVisa || "",
+                            commandVisa: activeItem.commandVisa || activeItem.dojReviewerName || "",
                             prevenu: activeItem.targetGroup
                               ? `${activeItem.targetName} (${activeItem.targetGroup})`
                               : activeItem.targetName,
                             reportText: activeItem.reportText,
                             exhibits: activeItem.exhibits || [],
-                            stampTopText: activeItem.status === "approved" ? "DOJ • SAN ANDREAS" : "LSPD • REQUÊTE DOJ",
-                            stampMainText: activeItem.status === "approved" ? "MANDAT APPROUVÉ" : "DOSSIER JUDICIAIRE",
+                            dojDecision: ["approved", "changes_requested", "rejected"].includes(activeItem.status)
+                              ? {
+                                  status: activeItem.status,
+                                  reviewerName: activeItem.dojReviewerName || activeItem.commandVisa || "Magistrat DOJ",
+                                  comment: activeItem.dojComment || "",
+                                  reviewedAt: activeItem.dojReviewedAt || ""
+                                }
+                              : null,
+                            stampTopText: ["approved", "changes_requested", "rejected"].includes(activeItem.status)
+                              ? "DOJ • SAN ANDREAS"
+                              : "LSPD • REQUÊTE DOJ",
+                            stampMainText:
+                              activeItem.status === "approved"
+                                ? "MANDAT APPROUVÉ"
+                                : activeItem.status === "rejected"
+                                ? "MANDAT REFUSÉ"
+                                : activeItem.status === "changes_requested"
+                                ? "COMPLÉMENT REQUIS"
+                                : "DOSSIER JUDICIAIRE",
                             statusLabel: activeItem.status === "approved" ? "MANDAT APPROUVÉ" : "REQUÊTE DOJ"
                           }
                     )
@@ -629,6 +663,7 @@ export default function DojReviewPortalView({
         prevenu={printPayload?.prevenu}
         reportText={printPayload?.reportText}
         exhibits={printPayload?.exhibits || []}
+        dojDecision={printPayload?.dojDecision || null}
         stampTopText={printPayload?.stampTopText}
         stampMainText={printPayload?.stampMainText}
         statusLabel={printPayload?.statusLabel}

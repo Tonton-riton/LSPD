@@ -819,9 +819,39 @@ export default function ReportsView({
         initialCommandVisa={draft?.commandVisa || ""}
         prevenu={draft?.prevenu}
         reportText={draft?.reportText || ""}
-        stampTopText={draft?.dojStatus === "approved" ? "DOJ • SAN ANDREAS" : "LSPD • SAN ANDREAS"}
-        stampMainText={draft?.dojStatus === "approved" ? "VALIDÉ PAR LE DOJ" : "CERTIFIÉ CONFORME"}
-        statusLabel={draft?.dojStatus === "approved" ? "VALIDÉ DOJ" : "OFFICIEL LSPD"}
+        dojDecision={
+          draft && ["approved", "changes_requested", "rejected"].includes(draft.dojStatus)
+            ? {
+                status: draft.dojStatus,
+                reviewerName: draft.dojReviewerName || draft.commandVisa || "Magistrat DOJ",
+                comment: draft.dojComment || "",
+                reviewedAt: draft.dojReviewedAt || ""
+              }
+            : null
+        }
+        stampTopText={
+          ["approved", "changes_requested", "rejected"].includes(draft?.dojStatus)
+            ? "DOJ • SAN ANDREAS"
+            : "LSPD • SAN ANDREAS"
+        }
+        stampMainText={
+          draft?.dojStatus === "approved"
+            ? "VALIDÉ PAR LE DOJ"
+            : draft?.dojStatus === "rejected"
+            ? "REFUSÉ PAR LE DOJ"
+            : draft?.dojStatus === "changes_requested"
+            ? "COMPLÉMENT REQUIS"
+            : "CERTIFIÉ CONFORME"
+        }
+        statusLabel={
+          draft?.dojStatus === "approved"
+            ? "VALIDÉ DOJ"
+            : draft?.dojStatus === "rejected"
+            ? "REFUSÉ DOJ"
+            : draft?.dojStatus === "changes_requested"
+            ? "COMPLÉMENT DOJ"
+            : "OFFICIEL LSPD"
+        }
         onSaveChanges={({ agent: nextAgent, commandVisa: nextVisa, docNumber: nextDoc, reportText: nextText }) => {
           if (!draft) return;
           const patched = {
