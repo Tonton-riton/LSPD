@@ -29,6 +29,9 @@ export default function ReportsView({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [agentFilter, setAgentFilter] = useState("ALL");
+  const [criminalFilter, setCriminalFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("recent"); // "recent" | "agent_asc" | "agent_desc" | "criminal_asc" | "criminal_desc" | "fine_desc"
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -86,10 +89,30 @@ export default function ReportsView({
     }
   }, [activeReport?.id, activeReport?.updatedAt]);
 
+  const agentOptions = useMemo(() => {
+    const counts = new Map();
+    reports.forEach(r => {
+      const name = (r.authorName || "Inconnu").trim();
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [reports]);
+
+  const criminalOptions = useMemo(() => {
+    const counts = new Map();
+    reports.forEach(r => {
+      const name = (r.prevenu || "Non renseigné").trim();
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [reports]);
+
   const filteredReports = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return reports.filter(r => {
+    const list = reports.filter(r => {
       if (statusFilter !== "ALL" && (r.dojStatus || "draft") !== statusFilter) return false;
+      if (agentFilter !== "ALL" && (r.authorName || "Inconnu").trim() !== agentFilter) return false;
+      if (criminalFilter !== "ALL" && (r.prevenu || "Non renseigné").trim() !== criminalFilter) return false;
       if (!q) return true;
       return (
         (r.reportNumber || "").toLowerCase().includes(q) ||
@@ -98,7 +121,21 @@ export default function ReportsView({
         (r.dojComment || "").toLowerCase().includes(q)
       );
     });
-  }, [reports, searchQuery, statusFilter]);
+
+    const sorted = [...list];
+    if (sortBy === "agent_asc") {
+      sorted.sort((a, b) => (a.authorName || "").localeCompare(b.authorName || "", "fr"));
+    } else if (sortBy === "agent_desc") {
+      sorted.sort((a, b) => (b.authorName || "").localeCompare(a.authorName || "", "fr"));
+    } else if (sortBy === "criminal_asc") {
+      sorted.sort((a, b) => (a.prevenu || "").localeCompare(b.prevenu || "", "fr"));
+    } else if (sortBy === "criminal_desc") {
+      sorted.sort((a, b) => (b.prevenu || "").localeCompare(a.prevenu || "", "fr"));
+    } else if (sortBy === "fine_desc") {
+      sorted.sort((a, b) => (Number(b.amendeRetenue) || 0) - (Number(a.amendeRetenue) || 0));
+    }
+    return sorted;
+  }, [reports, searchQuery, statusFilter, agentFilter, criminalFilter, sortBy]);
 
   const handleCreateBlankReport = async () => {
     const now = new Date();
@@ -278,6 +315,68 @@ export default function ReportsView({
                 <option key={k} value={k}>{v.label}</option>
               ))}
             </select>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <select
+                className="select"
+                style={{ fontSize: 12.5, padding: "6px 8px" }}
+                value={agentFilter}
+                onChange={e => setAgentFilter(e.target.value)}
+                title="Filtrer par Agent"
+              >
+                <option value="ALL">Tous les agents</option>
+                {agentOptions.map(([name, count]) => (
+                  <option key={name} value={name}>{name} ({count})</option>
+                ))}
+              </select>
+
+              <select
+                className="select"
+                style={{ fontSize: 12.5, padding: "6px 8px" }}
+                value={criminalFilter}
+                onChange={e => setCriminalFilter(e.target.value)}
+                title="Filtrer par Criminel / Prévenu"
+              >
+                <option value="ALL">Tous les criminels</option>
+                {criminalOptions.map(([name, count]) => (
+                  <option key={name} value={name}>{name} ({count})</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select
+                className="select"
+                style={{ fontSize: 12.5, padding: "6px 8px", flex: 1 }}
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                title="Trier les rapports"
+              >
+                <option value="recent">Tri : Plus récents</option>
+                <option value="agent_asc">Tri : Par Agent (A → Z)</option>
+                <option value="agent_desc">Tri : Par Agent (Z → A)</option>
+                <option value="criminal_asc">Tri : Par Criminel (A → Z)</option>
+                <option value="criminal_desc">Tri : Par Criminel (Z → A)</option>
+                <option value="fine_desc">Tri : Par Amende (Décroissant)</option>
+              </select>
+
+              {(agentFilter !== "ALL" || criminalFilter !== "ALL" || statusFilter !== "ALL" || searchQuery) && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => {
+                    setAgentFilter("ALL");
+                    setCriminalFilter("ALL");
+                    setStatusFilter("ALL");
+                    setSearchQuery("");
+                    setSortBy("recent");
+                  }}
+                  title="Réinitialiser tous les filtres"
+                >
+                  <i className="fas fa-xmark"></i>
+                </button>
+              )}
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "68vh", overflowY: "auto" }}>
               {filteredReports.map(rep => {

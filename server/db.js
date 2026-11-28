@@ -224,7 +224,7 @@ export async function initDb() {
     const defaultAdminPass = process.env.ADMIN_PASSWORD || 'LSPD2026!';
     const defaultAdminName = process.env.ADMIN_FULLNAME || 'Vance Winchester';
     const defaultAdminMat = process.env.ADMIN_MATRICULE || '16';
-    const defaultAdminRank = process.env.ADMIN_RANK || 'Commandant LSPD';
+    const defaultAdminRank = process.env.ADMIN_RANK || 'Capitaine';
 
     await createUser({
       username: defaultAdminUser,

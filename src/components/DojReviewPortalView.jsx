@@ -40,6 +40,9 @@ export default function DojReviewPortalView({
 }) {
   const [queueTab, setQueueTab] = useState("warrants"); // "warrants" | "reports"
   const [filterMode, setFilterMode] = useState("pending"); // "pending" | "all" | "approved" | "changes_requested" | "rejected"
+  const [agentFilter, setAgentFilter] = useState("ALL");
+  const [criminalFilter, setCriminalFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("recent"); // "recent" | "agent_asc" | "criminal_asc"
   const [selectedId, setSelectedId] = useState(null);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,24 +59,60 @@ export default function DojReviewPortalView({
     [dojRequests]
   );
 
+  const nonDraftSource = useMemo(() => {
+    if (queueTab === "reports") return reports.filter(r => (r.dojStatus || "draft") !== "draft");
+    return dojRequests.filter(r => (r.status || "draft") !== "draft");
+  }, [queueTab, reports, dojRequests]);
+
+  const dojAgentOptions = useMemo(() => {
+    const counts = new Map();
+    nonDraftSource.forEach(item => {
+      const a = (queueTab === "reports" ? item.authorName : item.leadAgent) || "Inconnu";
+      counts.set(a.trim(), (counts.get(a.trim()) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [nonDraftSource, queueTab]);
+
+  const dojCriminalOptions = useMemo(() => {
+    const counts = new Map();
+    nonDraftSource.forEach(item => {
+      const c = (queueTab === "reports" ? item.prevenu : item.targetName) || "Non renseigné";
+      counts.set(c.trim(), (counts.get(c.trim()) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [nonDraftSource, queueTab]);
+
   const filteredItems = useMemo(() => {
-    if (queueTab === "reports") {
-      return reports.filter(r => {
-        const st = r.dojStatus || "draft";
-        if (st === "draft") return false; // Les brouillons non transférés ne polluent pas la file DOJ
-        if (filterMode === "pending") return st === "submitted";
-        if (filterMode === "all") return true;
-        return st === filterMode;
+    const base = nonDraftSource.filter(item => {
+      const st = queueTab === "reports" ? (item.dojStatus || "draft") : (item.status || "draft");
+      if (filterMode === "pending") {
+        if (queueTab === "reports" ? st !== "submitted" : st !== "submitted" && st !== "pending") return false;
+      } else if (filterMode !== "all" && st !== filterMode) {
+        return false;
+      }
+      const agentName = ((queueTab === "reports" ? item.authorName : item.leadAgent) || "Inconnu").trim();
+      const crimName = ((queueTab === "reports" ? item.prevenu : item.targetName) || "Non renseigné").trim();
+      if (agentFilter !== "ALL" && agentName !== agentFilter) return false;
+      if (criminalFilter !== "ALL" && crimName !== criminalFilter) return false;
+      return true;
+    });
+
+    const sorted = [...base];
+    if (sortBy === "agent_asc") {
+      sorted.sort((a, b) => {
+        const aa = (queueTab === "reports" ? a.authorName : a.leadAgent) || "";
+        const bb = (queueTab === "reports" ? b.authorName : b.leadAgent) || "";
+        return aa.localeCompare(bb, "fr");
+      });
+    } else if (sortBy === "criminal_asc") {
+      sorted.sort((a, b) => {
+        const ca = (queueTab === "reports" ? a.prevenu : a.targetName) || "";
+        const cb = (queueTab === "reports" ? b.prevenu : b.targetName) || "";
+        return ca.localeCompare(cb, "fr");
       });
     }
-    return dojRequests.filter(r => {
-      const st = r.status || "draft";
-      if (st === "draft") return false;
-      if (filterMode === "pending") return st === "submitted" || st === "pending";
-      if (filterMode === "all") return true;
-      return st === filterMode;
-    });
-  }, [queueTab, filterMode, reports, dojRequests]);
+    return sorted;
+  }, [nonDraftSource, queueTab, filterMode, agentFilter, criminalFilter, sortBy]);
 
   const activeItem = useMemo(() => {
     return filteredItems.find(i => i.id === selectedId) || filteredItems[0] || null;
@@ -209,7 +248,43 @@ export default function DojReviewPortalView({
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "66vh", overflowY: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <select
+                className="select"
+                style={{ fontSize: 12, padding: "5px 7px" }}
+                value={agentFilter}
+                onChange={e => setAgentFilter(e.target.value)}
+              >
+                <option value="ALL">Tous agents</option>
+                {dojAgentOptions.map(([name, count]) => (
+                  <option key={name} value={name}>{name} ({count})</option>
+                ))}
+              </select>
+              <select
+                className="select"
+                style={{ fontSize: 12, padding: "5px 7px" }}
+                value={criminalFilter}
+                onChange={e => setCriminalFilter(e.target.value)}
+              >
+                <option value="ALL">Tous criminels</option>
+                {dojCriminalOptions.map(([name, count]) => (
+                  <option key={name} value={name}>{name} ({count})</option>
+                ))}
+              </select>
+            </div>
+
+            <select
+              className="select"
+              style={{ fontSize: 12, padding: "5px 7px" }}
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="recent">Tri : Plus récents</option>
+              <option value="agent_asc">Tri : Par Agent (A → Z)</option>
+              <option value="criminal_asc">Tri : Par Criminel / Cible (A → Z)</option>
+            </select>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "62vh", overflowY: "auto" }}>
               {filteredItems.map(item => {
                 const isSelected = activeItem?.id === item.id;
                 const stKey = queueTab === "reports" ? item.dojStatus : item.status;

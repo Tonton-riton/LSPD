@@ -35,6 +35,7 @@ import DojReviewPortalView from "./components/DojReviewPortalView";
 import UserManagementView from "./components/UserManagementView";
 import { DOJ_TEMPLATES } from "./data/dojTemplates";
 import { LSPD_LOGO_DATA_URL } from "./assets/lspdLogo";
+import { getRankStyle } from "./data/lspdRanks";
 
 const STORAGE_KEYS = {
   THEME: "sa_mdt_theme_v4",
@@ -962,14 +963,30 @@ export default function App() {
             </button>
             <div className="topbar-user">
               <span>#{agentMatricule} · {agentDisplayName}</span>
-              <span className="role-badge patron" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <img
-                  src={LSPD_LOGO_DATA_URL}
-                  alt="LSPD"
-                  style={{ width: 16, height: 16, objectFit: "contain", borderRadius: "50%" }}
-                />
-                {roleShortTag}
-              </span>
+              {(() => {
+                const displayRank = currentUser?.rank || meta.roleLabel || roleShortTag;
+                const rStyle = getRankStyle(displayRank);
+                return (
+                  <span
+                    className="role-badge patron"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      color: rStyle.color,
+                      background: rStyle.bg,
+                      borderColor: rStyle.border
+                    }}
+                  >
+                    <img
+                      src={LSPD_LOGO_DATA_URL}
+                      alt="LSPD"
+                      style={{ width: 16, height: 16, objectFit: "contain", borderRadius: "50%" }}
+                    />
+                    {displayRank.toUpperCase()}
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </header>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { formatMinutesToHours } from "../utils/formulaEngine";
 import { getCategoryBadgeClass } from "./CalculatorView";
 import PrintReportModal from "./PrintReportModal";
@@ -51,6 +51,57 @@ export default function DashboardAndHistoryView({
   const [editDraft, setEditDraft] = useState(null);
   const [copiedEdit, setCopiedEdit] = useState(false);
   const [printArchiveIdx, setPrintArchiveIdx] = useState(null);
+  const [histSearch, setHistSearch] = useState("");
+  const [histAgentFilter, setHistAgentFilter] = useState("ALL");
+  const [histCriminalFilter, setHistCriminalFilter] = useState("ALL");
+  const [histSortBy, setHistSortBy] = useState("recent");
+
+  const histAgentOptions = useMemo(() => {
+    const counts = new Map();
+    history.forEach(h => {
+      const a = (h.agent || "Inconnu").trim();
+      counts.set(a, (counts.get(a) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [history]);
+
+  const histCriminalOptions = useMemo(() => {
+    const counts = new Map();
+    history.forEach(h => {
+      const c = (h.prevenu || "Non renseigné").trim();
+      counts.set(c, (counts.get(c) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [history]);
+
+  const filteredHistoryRows = useMemo(() => {
+    const q = histSearch.trim().toLowerCase();
+    const indexed = history
+      .map((item, origIdx) => ({ item, origIdx }))
+      .filter(({ item }) => {
+        if (histAgentFilter !== "ALL" && (item.agent || "Inconnu").trim() !== histAgentFilter) return false;
+        if (histCriminalFilter !== "ALL" && (item.prevenu || "Non renseigné").trim() !== histCriminalFilter) return false;
+        if (!q) return true;
+        return (
+          (item.id || "").toLowerCase().includes(q) ||
+          (item.prevenu || "").toLowerCase().includes(q) ||
+          (item.agent || "").toLowerCase().includes(q)
+        );
+      });
+
+    if (histSortBy === "agent_asc") {
+      indexed.sort((a, b) => (a.item.agent || "").localeCompare(b.item.agent || "", "fr"));
+    } else if (histSortBy === "agent_desc") {
+      indexed.sort((a, b) => (b.item.agent || "").localeCompare(a.item.agent || "", "fr"));
+    } else if (histSortBy === "criminal_asc") {
+      indexed.sort((a, b) => (a.item.prevenu || "").localeCompare(b.item.prevenu || "", "fr"));
+    } else if (histSortBy === "criminal_desc") {
+      indexed.sort((a, b) => (b.item.prevenu || "").localeCompare(a.item.prevenu || "", "fr"));
+    } else if (histSortBy === "fine_desc") {
+      indexed.sort((a, b) => (Number(b.item.amendeRetenue) || 0) - (Number(a.item.amendeRetenue) || 0));
+    }
+    return indexed;
+  }, [history, histSearch, histAgentFilter, histCriminalFilter, histSortBy]);
 
   const totalAmended = history.reduce((s, h) => s + (Number(h.amendeRetenue) || 0), 0);
   const totalMinutes = history.reduce((s, h) => s + (Number(h.peineRetenueMinutes) || 0), 0);
@@ -242,6 +293,54 @@ export default function DashboardAndHistoryView({
               <p>Aucun dossier enregistré pour le moment.</p>
             </div>
           ) : (
+            <>
+              {/* BARRE DE FILTRE & TRI PAR AGENT / CRIMINEL */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
+                <input
+                  type="text"
+                  className="input"
+                  style={{ flex: "1 1 200px", padding: "7px 10px", fontSize: 13 }}
+                  placeholder="Rechercher N° dossier, criminel, agent..."
+                  value={histSearch}
+                  onChange={e => setHistSearch(e.target.value)}
+                />
+                <select
+                  className="select"
+                  style={{ width: 210, padding: "7px 10px", fontSize: 13 }}
+                  value={histAgentFilter}
+                  onChange={e => setHistAgentFilter(e.target.value)}
+                >
+                  <option value="ALL">Tous les agents ({history.length})</option>
+                  {histAgentOptions.map(([name, count]) => (
+                    <option key={name} value={name}>{name} ({count})</option>
+                  ))}
+                </select>
+                <select
+                  className="select"
+                  style={{ width: 210, padding: "7px 10px", fontSize: 13 }}
+                  value={histCriminalFilter}
+                  onChange={e => setHistCriminalFilter(e.target.value)}
+                >
+                  <option value="ALL">Tous les criminels</option>
+                  {histCriminalOptions.map(([name, count]) => (
+                    <option key={name} value={name}>{name} ({count})</option>
+                  ))}
+                </select>
+                <select
+                  className="select"
+                  style={{ width: 210, padding: "7px 10px", fontSize: 13 }}
+                  value={histSortBy}
+                  onChange={e => setHistSortBy(e.target.value)}
+                >
+                  <option value="recent">Tri : Plus récents</option>
+                  <option value="agent_asc">Tri : Par Agent (A → Z)</option>
+                  <option value="agent_desc">Tri : Par Agent (Z → A)</option>
+                  <option value="criminal_asc">Tri : Par Criminel (A → Z)</option>
+                  <option value="criminal_desc">Tri : Par Criminel (Z → A)</option>
+                  <option value="fine_desc">Tri : Par Amende (Décroissant)</option>
+                </select>
+              </div>
+
             <div className="table-responsive">
               <table className="data-table">
                 <thead>
@@ -258,8 +357,8 @@ export default function DashboardAndHistoryView({
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((item, idx) => (
-                    <tr key={item.id + "_" + idx}>
+                  {filteredHistoryRows.map(({ item, origIdx }) => (
+                    <tr key={item.id + "_" + origIdx}>
                       <td className="serial">{item.id}</td>
                       <td>{item.date} {item.heure}</td>
                       <td><strong style={{ color: "var(--text-primary)" }}>{item.prevenu || "—"}</strong></td>
@@ -295,7 +394,7 @@ export default function DashboardAndHistoryView({
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
-                            onClick={() => openEditModal(idx)}
+                            onClick={() => openEditModal(origIdx)}
                             title="Modifier ce dossier déjà créé (Agent signataire, infos, rapport)"
                           >
                             <i className="fas fa-pen-to-square"></i> Modifier
@@ -304,7 +403,7 @@ export default function DashboardAndHistoryView({
                             type="button"
                             className="btn btn-sm btn-outline"
                             style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
-                            onClick={() => setPrintArchiveIdx(idx)}
+                            onClick={() => setPrintArchiveIdx(origIdx)}
                             title="Imprimer ce dossier en jeu (Feuille A4 LSPD + Lien .PNG)"
                           >
                             <i className="fas fa-print"></i>
@@ -320,7 +419,7 @@ export default function DashboardAndHistoryView({
                           <button
                             type="button"
                             className="btn btn-sm btn-danger"
-                            onClick={() => onDeleteHistoryItem(idx)}
+                            onClick={() => onDeleteHistoryItem(origIdx)}
                             title="Supprimer ce dossier"
                           >
                             <i className="fas fa-trash"></i>
@@ -332,6 +431,7 @@ export default function DashboardAndHistoryView({
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>

@@ -8,6 +8,7 @@ import {
   apiSaveSettings
 } from "../utils/apiClient";
 import { LSPD_LOGO_DATA_URL } from "../assets/lspdLogo";
+import { LSPD_RANKS, DOJ_RANKS, ALL_OFFICIAL_RANKS, getRankStyle } from "../data/lspdRanks";
 
 const ROLE_LABELS = {
   OFFICER:      { label: "Officier LSPD",             color: "#38bdf8", bg: "rgba(56, 189, 248, 0.16)" },
@@ -26,7 +27,7 @@ export default function UserManagementView({ currentUser, dbMode }) {
   const [newPassword, setNewPassword] = useState("");
   const [newFullName, setNewFullName] = useState("");
   const [newMatricule, setNewMatricule] = useState("");
-  const [newRank, setNewRank] = useState("Procureur DOJ");
+  const [newRank, setNewRank] = useState("Procureur");
   const [newRole, setNewRole] = useState("DOJ");
 
   // Password reset inline
@@ -204,8 +205,8 @@ export default function UserManagementView({ currentUser, dbMode }) {
                     <th>Identifiant</th>
                     <th>Matricule</th>
                     <th>Nom & Prénom RP</th>
-                    <th>Grade</th>
-                    <th>Rôle & Accès</th>
+                    <th>Grade LSPD / DOJ</th>
+                    <th>Accès / Permissions</th>
                     <th>Statut</th>
                     <th>Actions</th>
                   </tr>
@@ -246,17 +247,42 @@ export default function UserManagementView({ currentUser, dbMode }) {
                           />
                         </td>
                         <td>
-                          <input
-                            type="text"
-                            className="input"
-                            style={{ minWidth: 135, padding: "4px 8px", fontSize: 13 }}
-                            defaultValue={u.rank}
-                            onBlur={e => {
-                              if (e.target.value !== u.rank) {
-                                handleFieldSave(u.id, { rank: e.target.value });
-                              }
-                            }}
-                          />
+                          {(() => {
+                            const rStyle = getRankStyle(u.rank);
+                            const isCustomRank = u.rank && !ALL_OFFICIAL_RANKS.includes(u.rank);
+                            return (
+                              <select
+                                className="select"
+                                value={u.rank || "Officier"}
+                                onChange={e => handleFieldSave(u.id, { rank: e.target.value })}
+                                style={{
+                                  minWidth: 150,
+                                  padding: "5px 8px",
+                                  fontSize: 12.5,
+                                  fontWeight: 700,
+                                  color: rStyle.color,
+                                  borderColor: rStyle.border,
+                                  background: rStyle.bg
+                                }}
+                              >
+                                {isCustomRank && <option value={u.rank}>{u.rank}</option>}
+                                <optgroup label="━━ GRADES LSPD ━━">
+                                  {LSPD_RANKS.map(r => (
+                                    <option key={r} value={r} style={{ background: "#0b1528", color: "#fff" }}>
+                                      {r}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="━━ GRADES DOJ ━━">
+                                  {DOJ_RANKS.map(r => (
+                                    <option key={r} value={r} style={{ background: "#0b1528", color: "#dfb556" }}>
+                                      {r}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                            );
+                          })()}
                         </td>
                         <td>
                           <select
@@ -392,15 +418,35 @@ export default function UserManagementView({ currentUser, dbMode }) {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Grade / Titre</label>
-                  <input type="text" value={newRank} onChange={e => setNewRank(e.target.value)} />
+                  <label>Grade LSPD / DOJ</label>
+                  <select value={newRank} onChange={e => setNewRank(e.target.value)}>
+                    <optgroup label="━━ GRADES LSPD ━━">
+                      {LSPD_RANKS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="━━ GRADES DOJ ━━">
+                      {DOJ_RANKS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </optgroup>
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label>Rôle attribué</label>
-                  <select value={newRole} onChange={e => setNewRole(e.target.value)}>
+                  <label>Accès / Permissions</label>
+                  <select
+                    value={newRole}
+                    onChange={e => {
+                      const r = e.target.value;
+                      setNewRole(r);
+                      if (r === "DOJ") setNewRank("Procureur");
+                      else if (r === "HIGH_COMMAND") setNewRank("Capitaine");
+                      else setNewRank("Officier");
+                    }}
+                  >
                     <option value="DOJ">DOJ (Juge / Procureur)</option>
                     <option value="OFFICER">Officier LSPD</option>
-                    <option value="HIGH_COMMAND">Haut Gradé LSPD</option>
+                    <option value="HIGH_COMMAND">Haut Gradé LSPD (Command)</option>
                   </select>
                 </div>
               </div>

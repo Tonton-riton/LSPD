@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { apiLogin, apiRegister } from "../utils/apiClient";
 import { LSPD_LOGO_DATA_URL } from "../assets/lspdLogo";
+import { LSPD_RANKS } from "../data/lspdRanks";
 
 export default function AuthScreen({ onAuthenticated, dbMode }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -228,13 +229,12 @@ export default function AuthScreen({ onAuthenticated, dbMode }) {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Grade / Fonction</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Officier I, Sergent, Détective, Procureur..."
-                    value={rank}
-                    onChange={e => setRank(e.target.value)}
-                  />
+                  <label>Grade LSPD</label>
+                  <select value={rank} onChange={e => setRank(e.target.value)}>
+                    {LSPD_RANKS.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div
