@@ -1,6 +1,6 @@
 node_modules/
 printed_docs/
-data/
+/data/
 .env
 .DS_Store
 *.log
