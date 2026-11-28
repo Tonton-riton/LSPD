@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { LSPD_TEMPLATES, LSPD_TEMPLATE_GROUPS } from "../data/lspdTemplates";
 import PrintReportModal from "./PrintReportModal";
 import { syncSigningAgentInText } from "../utils/generatePrintableReport";
+import { LSPD_LOGO_DATA_URL } from "../assets/lspdLogo";
 
 export { LSPD_TEMPLATES };
 
@@ -631,8 +632,9 @@ export default function InvestigationsView({
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div className="card">
                 <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <h2>
-                    <i className="fas fa-shield-halved"></i> Dossier {activeCase.caseNumber} — {activeCase.title}
+                  <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <img src={LSPD_LOGO_DATA_URL} alt="LSPD" style={{ width: 24, height: 24, objectFit: "contain" }} />
+                    <span>Dossier {activeCase.caseNumber} — {activeCase.title}</span>
                   </h2>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button

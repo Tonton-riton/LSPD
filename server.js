@@ -50,7 +50,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && safeUrl === '/api/print-image') {
     let body = '';
     let size = 0;
-    const MAX_BODY = 6 * 1024 * 1024; // 6 MB limit
+    const MAX_BODY = 15 * 1024 * 1024; // 15 MB limit (supports DOJ warrants with photo exhibits)
 
     req.on('data', chunk => {
       size += chunk.length;

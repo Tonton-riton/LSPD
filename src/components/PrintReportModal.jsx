@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   generatePrintablePaperCanvas,
   triggerBrowserPrint,
-  syncSigningAgentInText
+  syncSigningAgentInText,
+  loadExhibitImages
 } from "../utils/generatePrintableReport";
+import { ensureLspdLogoLoaded } from "../assets/lspdLogo";
 
 export default function PrintReportModal({
   isOpen,
@@ -17,6 +19,10 @@ export default function PrintReportModal({
   initialCommandVisa = "",
   prevenu,
   reportText,
+  exhibits = [],
+  stampTopText = "LSPD • SAN ANDREAS",
+  stampMainText = "CERTIFIÉ CONFORME",
+  statusLabel = "OFFICIEL LSPD",
   renderCustomCanvas,
   autoCopyOnOpen = false,
   onSaveChanges
@@ -24,6 +30,7 @@ export default function PrintReportModal({
   const [signingAgent, setSigningAgent] = useState(agent || "16 | Vance Winchester");
   const [commandVisa, setCommandVisa] = useState(initialCommandVisa || "");
   const [editableDocNumber, setEditableDocNumber] = useState(docNumber || "LSPD-2026-001");
+  const [exhibitPrintMode, setExhibitPrintMode] = useState("all"); // "all" | "text_only" | "exhibits_only"
   const [dataUrl, setDataUrl] = useState(null);
   const [canvasRef, setCanvasRef] = useState(null);
   const [directUrl, setDirectUrl] = useState("");
@@ -33,12 +40,15 @@ export default function PrintReportModal({
   const wasOpenRef = useRef(false);
   const didAutoCopyRef = useRef(false);
 
+  const hasExhibits = Array.isArray(exhibits) && exhibits.length > 0;
+
   // Synchronise les champs UNIQUEMENT à l'ouverture de la modale (sans écraser pendant la saisie)
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
       setSigningAgent(agent || "16 | Vance Winchester");
       setEditableDocNumber(docNumber || "LSPD-2026-001");
       setCommandVisa(initialCommandVisa || "");
+      setExhibitPrintMode("all");
       setSavedIndicator(false);
       didAutoCopyRef.current = false;
     }
@@ -75,55 +85,77 @@ export default function PrintReportModal({
     }
   }, []);
 
-  // Re-rend la feuille papier A4 en temps réel dès que le signataire, visa ou numéro change
+  // Re-rend la feuille papier A4 en temps réel (attend le chargement du logo LSPD & des preuves photos)
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
+    let uploadTimer = null;
 
-    let canvas;
-    if (typeof renderCustomCanvas === "function") {
-      canvas = renderCustomCanvas({
-        signingAgent,
-        commandVisa,
-        docNumber: editableDocNumber
-      });
-    } else {
-      const adjustedText = syncSigningAgentInText(reportText, signingAgent);
-      canvas = generatePrintablePaperCanvas({
-        title,
-        docNumber: editableDocNumber,
-        date,
-        agent: signingAgent,
-        commandVisa,
-        prevenu,
-        reportText: adjustedText
-      });
-    }
+    (async () => {
+      await ensureLspdLogoLoaded();
+      const loadedExhibits =
+        hasExhibits && exhibitPrintMode !== "text_only"
+          ? await loadExhibitImages(exhibits)
+          : [];
 
-    const url = canvas.toDataURL("image/png");
-    setCanvasRef(canvas);
-    setDataUrl(url);
+      if (cancelled) return;
 
-    // Copie automatique optionnelle à l'ouverture (ex: bouton "Générer & Copier l'Image des Amendes")
-    if (autoCopyOnOpen && !didAutoCopyRef.current) {
-      didAutoCopyRef.current = true;
-      canvas.toBlob(async blob => {
-        try {
-          if (blob && navigator.clipboard && window.ClipboardItem) {
-            await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
-            showStatus("Feuille A4 copiée dans le presse-papiers ! Collez sur Discord (Ctrl+V) ou utilisez le lien d'imprimante FiveM.");
+      let canvas;
+      if (typeof renderCustomCanvas === "function") {
+        canvas = renderCustomCanvas({
+          signingAgent,
+          commandVisa,
+          docNumber: editableDocNumber
+        });
+      } else {
+        const adjustedText = syncSigningAgentInText(reportText, signingAgent);
+        canvas = generatePrintablePaperCanvas({
+          title,
+          docNumber: editableDocNumber,
+          date,
+          agent: signingAgent,
+          commandVisa,
+          prevenu,
+          reportText: adjustedText,
+          exhibits: loadedExhibits,
+          exhibitsOnly: exhibitPrintMode === "exhibits_only",
+          stampTopText,
+          stampMainText,
+          statusLabel
+        });
+      }
+
+      const url = canvas.toDataURL("image/png");
+      if (cancelled) return;
+      setCanvasRef(canvas);
+      setDataUrl(url);
+
+      // Copie automatique optionnelle à l'ouverture (ex: Fiche Amendes)
+      if (autoCopyOnOpen && !didAutoCopyRef.current) {
+        didAutoCopyRef.current = true;
+        canvas.toBlob(async blob => {
+          try {
+            if (blob && navigator.clipboard && window.ClipboardItem) {
+              await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
+              showStatus("Feuille A4 copiée dans le presse-papiers ! Collez sur Discord (Ctrl+V) ou utilisez le lien d'imprimante FiveM.");
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore if browser blocks automatic clipboard write
+        }, "image/png");
+      }
+
+      uploadTimer = setTimeout(() => {
+        if (!cancelled) {
+          uploadToPrinterEndpoint(url, editableDocNumber);
         }
-      }, "image/png");
-    }
+      }, 380);
+    })();
 
-    // Debounce l'upload vers /api/print-image quand l'utilisateur tape le nom du signataire
-    const timer = setTimeout(() => {
-      uploadToPrinterEndpoint(url, editableDocNumber);
-    }, 380);
-
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      if (uploadTimer) clearTimeout(uploadTimer);
+    };
   }, [
     isOpen,
     title,
@@ -133,6 +165,12 @@ export default function PrintReportModal({
     commandVisa,
     prevenu,
     reportText,
+    exhibits,
+    hasExhibits,
+    exhibitPrintMode,
+    stampTopText,
+    stampMainText,
+    statusLabel,
     renderCustomCanvas,
     autoCopyOnOpen,
     showStatus,
@@ -191,9 +229,10 @@ export default function PrintReportModal({
   const handleDownloadPng = () => {
     if (!dataUrl) return;
     const safeName = (editableDocNumber || prevenu || "Document_LSPD").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const suffix = exhibitPrintMode === "exhibits_only" ? "_Preuves" : "";
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = `${downloadPrefix}_${safeName}.png`;
+    a.download = `${downloadPrefix}_${safeName}${suffix}.png`;
     a.click();
     showStatus("Feuille papier LSPD téléchargée en .PNG !");
   };
@@ -294,13 +333,13 @@ export default function PrintReportModal({
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 4 }}>
               <i className="fas fa-stamp" style={{ marginRight: 5 }}></i>
-              Visa Commandement / DOJ (Optionnel)
+              Visa Commandement / Juge / Procureur
             </label>
             <input
               type="text"
               className="input"
               style={{ padding: "7px 10px", fontSize: 13.5 }}
-              placeholder="Ex: Cdt. Miller / Procureur..."
+              placeholder="Ex: Juge Harrison / Procureur..."
               value={commandVisa}
               onChange={e => handleCommandVisaChange(e.target.value)}
             />
@@ -319,6 +358,50 @@ export default function PrintReportModal({
             />
           </div>
         </div>
+
+        {/* SÉLECTEUR D'IMPRESSION DES PREUVES (SI DES PIÈCES JOINTES SONT PRÉSENTES) */}
+        {hasExhibits && !renderCustomCanvas && (
+          <div
+            style={{
+              padding: "8px 20px",
+              background: "#0a172c",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 8
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)" }}>
+              <i className="fas fa-images" style={{ marginRight: 6 }}></i>
+              PREUVES JOINTES ({exhibits.length}) — MODE D'IMPRESSION :
+            </span>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${exhibitPrintMode === "all" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setExhibitPrintMode("all")}
+              >
+                <i className="fas fa-file-image"></i> Requête + Preuves ensemble
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${exhibitPrintMode === "text_only" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setExhibitPrintMode("text_only")}
+              >
+                <i className="fas fa-file-lines"></i> Page 1 : Requête seule
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${exhibitPrintMode === "exhibits_only" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setExhibitPrintMode("exhibits_only")}
+              >
+                <i className="fas fa-camera"></i> Page 2 : Annexe Preuves seule
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* DIRECT FIVEM IN-GAME PRINTER URL BOX */}
         <div

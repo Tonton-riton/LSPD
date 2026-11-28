@@ -1,6 +1,9 @@
-// Générateur de feuille papier A4 officielle LSPD (style document imprimé en jeu FiveM)
-// Rend n'importe quel rapport (Arrestation, Braquage, Enquête, Mandat, Plainte, Interrogatoire...)
-// sur une vraie feuille papier A4 blanche avec en-tête officiel LSPD, sceau, tampon "CERTIFIÉ CONFORME" et signature.
+// Générateur de feuille papier A4 officielle LSPD / DOJ (style document imprimé en jeu FiveM)
+// Rend n'importe quel rapport (Arrestation, Braquage, Enquête, Demande DOJ de Descente / Mandat, Plainte...)
+// sur une vraie feuille papier A4 blanche avec le vrai logo officiel LSPD, filigrane,
+// preuves photographiques / pièces à conviction annexées, tampon "CERTIFIÉ CONFORME" et signatures.
+
+import { getLspdLogoImage } from "../assets/lspdLogo";
 
 /**
  * Met à jour automatiquement la ligne de signature (et l'agent rédacteur) dans le texte d'un rapport
@@ -9,14 +12,14 @@
 export function syncSigningAgentInText(text, newAgent) {
   const cleanAgent = (newAgent || "").trim() || "Officier LSPD";
   let updated = String(text || "").replace(
-    /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*)([^\n—]+)/gi,
+    /(Signé\s*:\s*|Certifié (?:exact|conforme) par\s*:\s*|Rapport rédigé et certifié exact par\s*:\s*|Agent émetteur\s*:\s*|Requête soumise et certifiée exacte par\s*:\s*)([^\n—]+)/gi,
     (match, prefix, val) => {
       const hadTrailingSpace = /\s$/.test(val);
       return `${prefix}${cleanAgent}${hadTrailingSpace ? " " : ""}`;
     }
   );
   updated = updated.replace(
-    /([•\-]\s*(?:Agent rédacteur(?: \(En charge\))?|Officier rédacteur|Agent en charge|Signataire)\s*:\s*)([^\n]+)/gi,
+    /([•\-]\s*(?:Agent rédacteur(?: \(En charge\))?|Officier rédacteur|Agent en charge|Officier demandeur|Signataire)\s*:\s*)([^\n]+)/gi,
     (match, prefix) => `${prefix}${cleanAgent}`
   );
   return updated;
@@ -47,61 +50,62 @@ function wrapLines(ctx, text, maxWidth) {
   return result;
 }
 
+/**
+ * Dessine le véritable logo officiel LSPD fourni par l'utilisateur (fallback vectoriel si pas encore décodé)
+ */
 export function drawLspdBadge(ctx, cx, cy, r) {
+  const logoImg = getLspdLogoImage();
+  if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    const size = r * 2.15;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    ctx.drawImage(logoImg, cx - size / 2, cy - size / 2, size, size);
+    ctx.restore();
+    return;
+  }
+
+  // Fallback vectoriel minimal uniquement si l'image n'est pas encore prête
   ctx.save();
-  // Outer gold ring
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = "#0b1e36";
   ctx.fill();
   ctx.lineWidth = 3;
-  ctx.strokeStyle = "#b8891f";
-  ctx.stroke();
-
-  // Inner dashed ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - 6, 0, Math.PI * 2);
-  ctx.setLineDash([3, 3]);
-  ctx.lineWidth = 1.2;
   ctx.strokeStyle = "#dfb556";
   ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Shield shape inside
-  ctx.beginPath();
-  ctx.moveTo(cx - r * 0.45, cy - r * 0.36);
-  ctx.lineTo(cx + r * 0.45, cy - r * 0.36);
-  ctx.lineTo(cx + r * 0.45, cy + r * 0.08);
-  ctx.quadraticCurveTo(cx + r * 0.45, cy + r * 0.46, cx, cy + r * 0.62);
-  ctx.quadraticCurveTo(cx - r * 0.45, cy + r * 0.46, cx - r * 0.45, cy + r * 0.08);
-  ctx.closePath();
-  ctx.fillStyle = "#143054";
-  ctx.fill();
-  ctx.lineWidth = 1.8;
-  ctx.strokeStyle = "#dfb556";
-  ctx.stroke();
-
-  // 5-point Star
-  ctx.beginPath();
-  const spikes = 5;
-  const outerR = r * 0.28;
-  const innerR = r * 0.12;
-  for (let i = 0; i < spikes * 2; i++) {
-    const rad = (i * Math.PI) / spikes - Math.PI / 2;
-    const dist = i % 2 === 0 ? outerR : innerR;
-    const sx = cx + Math.cos(rad) * dist;
-    const sy = cy + 3 + Math.sin(rad) * dist;
-    if (i === 0) ctx.moveTo(sx, sy);
-    else ctx.lineTo(sx, sy);
-  }
-  ctx.closePath();
-  ctx.fillStyle = "#dfb556";
-  ctx.fill();
-
   ctx.restore();
 }
 
-export function drawInkStamp(ctx, cx, cy, dateStr, refStr) {
+/**
+ * Filigrane subtil centré avec le vrai sceau LSPD + texte diagonal
+ */
+export function drawLspdWatermark(ctx, width, totalHeight) {
+  const logoImg = getLspdLogoImage();
+  if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.055;
+    const wmSize = 420;
+    ctx.drawImage(logoImg, (width - wmSize) / 2, (totalHeight - wmSize) / 2, wmSize, wmSize);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(width / 2, totalHeight / 2);
+  ctx.rotate((-32 * Math.PI) / 180);
+  ctx.fillStyle = "rgba(11, 30, 54, 0.035)";
+  ctx.textAlign = "center";
+  ctx.font = "900 56px 'Orbitron', sans-serif";
+  ctx.fillText("LOS SANTOS POLICE DEPT.", 0, 0);
+  ctx.font = "800 30px 'Inter', sans-serif";
+  ctx.fillText("OFFICIAL RECORD — SAN ANDREAS", 0, 46);
+  ctx.restore();
+}
+
+export function drawInkStamp(ctx, cx, cy, dateStr, refStr, topText = "LSPD • SAN ANDREAS", mainText = "CERTIFIÉ CONFORME") {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate((-7 * Math.PI) / 180);
@@ -110,22 +114,53 @@ export function drawInkStamp(ctx, cx, cy, dateStr, refStr) {
   // Double rectangle stamp in official LSPD ink blue
   ctx.strokeStyle = "#1d4ed8";
   ctx.lineWidth = 3;
-  ctx.strokeRect(-102, -34, 204, 68);
+  ctx.strokeRect(-104, -34, 208, 68);
   ctx.lineWidth = 1.2;
-  ctx.strokeRect(-96, -28, 192, 56);
+  ctx.strokeRect(-98, -28, 196, 56);
 
   ctx.fillStyle = "#1d4ed8";
   ctx.textAlign = "center";
-  ctx.font = "900 13px 'Orbitron', sans-serif";
-  ctx.fillText("LSPD • SAN ANDREAS", 0, -9);
+  ctx.font = "900 12.5px 'Orbitron', sans-serif";
+  ctx.fillText(topText, 0, -9);
 
-  ctx.font = "900 16px 'Inter', sans-serif";
-  ctx.fillText("CERTIFIÉ CONFORME", 0, 10);
+  ctx.font = "900 15.5px 'Inter', sans-serif";
+  ctx.fillText(mainText, 0, 10);
 
   ctx.font = "700 10px 'JetBrains Mono', monospace";
   ctx.fillText(`${dateStr || ""} — ${(refStr || "OFFICIEL").slice(0, 16)}`, 0, 23);
 
   ctx.restore();
+}
+
+/**
+ * Charge de manière asynchrone les images des pièces à conviction / preuves jointes
+ * pour les dessiner proprement sur le Canvas imprimable sans bloquer.
+ */
+export async function loadExhibitImages(exhibits = []) {
+  if (!Array.isArray(exhibits) || exhibits.length === 0) return [];
+  const results = await Promise.all(
+    exhibits.map(ex => {
+      const src = ex.imageData || ex.imageUrl || "";
+      if (!src) return Promise.resolve({ ...ex, imageEl: null });
+      return new Promise(resolve => {
+        const img = new Image();
+        if (!src.startsWith("data:")) {
+          img.crossOrigin = "anonymous";
+        }
+        const timer = setTimeout(() => resolve({ ...ex, imageEl: null }), 4500);
+        img.onload = () => {
+          clearTimeout(timer);
+          resolve({ ...ex, imageEl: img });
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve({ ...ex, imageEl: null });
+        };
+        img.src = src;
+      });
+    })
+  );
+  return results;
 }
 
 export function generatePrintablePaperCanvas({
@@ -135,98 +170,93 @@ export function generatePrintablePaperCanvas({
   agent = "16 | Vance Winchester",
   commandVisa = "",
   prevenu = "",
-  reportText = ""
+  reportText = "",
+  exhibits = [],
+  exhibitsOnly = false,
+  stampTopText = "LSPD • SAN ANDREAS",
+  stampMainText = "CERTIFIÉ CONFORME",
+  statusLabel = "OFFICIEL LSPD"
 }) {
-  const scale = 1.5; // 1500px wide crisp print PNG (~180-320KB, fast in FiveM NUI!)
+  const scale = 1.5; // 1500px wide crisp print PNG (rapide en NUI FiveM)
   const width = 1000;
   const marginX = 64;
-  const contentWidth = width - marginX * 2;
+  const contentWidth = width - marginX * 2; // 872px
 
   const todayStr = date || new Date().toLocaleDateString("fr-FR");
 
-  // Parse the report text lines to render cleanly on white paper
-  const rawLines = String(reportText || "").split(/\r?\n/);
-  const parsedBlocks = [];
+  // Parse reportText into clean structured paper blocks
+  const rawLines = exhibitsOnly ? [] : String(reportText || "").replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
   let extractedSubtitle = title;
 
   for (let i = 0; i < rawLines.length; i++) {
-    const raw = rawLines[i];
-    const trimmed = raw.trim();
+    const line = rawLines[i];
+    const trimmed = line.trim();
 
-    // Skip decorative ASCII box lines from text mode (we render real official paper letterhead instead!)
+    // Skip ASCII box borders ╔═╗ ╚═╝
     if (/^[╔╚═]+$/.test(trimmed)) continue;
-    if (i < 5 && (trimmed.startsWith("LOS SANTOS POLICE") || trimmed.startsWith("LSPD") || trimmed.startsWith("REQUÊTE AUX FINS"))) {
+
+    // Extract title inside ASCII header banner if present
+    if (i > 0 && i < 6 && /^[╔═]/.test((rawLines[i - 1] || "").trim())) {
       extractedSubtitle = trimmed;
       continue;
     }
-    if (i < 6 && (trimmed.startsWith("RÉFÉRENCE") || trimmed.startsWith("DOSSIER N°") || trimmed.startsWith("CODE 10-") || trimmed.startsWith("ALERTE") || trimmed.startsWith("N° DE") || trimmed.startsWith("N° D'ALERTE") || trimmed.startsWith("BORDEREAU") || trimmed.startsWith("FEUILLE DE") || trimmed.startsWith("CONFORME À"))) {
+    if (i > 1 && i < 6 && /^(RÉFÉRENCE|DOSSIER|CODE|ALERTE|REQUÊTE|MANDAT)/i.test(trimmed) && /^[╚═]/.test((rawLines[i + 1] || "").trim())) {
       continue;
     }
 
     if (!trimmed) {
-      parsedBlocks.push({ type: "spacer" });
-      continue;
+      blocks.push({ type: "spacer", h: 10 });
+    } else if (/^\[.+\]$/.test(trimmed)) {
+      blocks.push({ type: "section", text: trimmed.slice(1, -1) });
+    } else if (/^━━/.test(trimmed)) {
+      blocks.push({ type: "section", text: trimmed.replace(/━/g, "").trim() });
+    } else if (/^[•\-▪]\s+/.test(trimmed)) {
+      const clean = trimmed.replace(/^[•\-▪]\s+/, "");
+      const colonIdx = clean.indexOf(":");
+      if (colonIdx > 0 && colonIdx < 52) {
+        blocks.push({
+          type: "kv",
+          label: clean.slice(0, colonIdx).trim(),
+          value: clean.slice(colonIdx + 1).trim()
+        });
+      } else {
+        blocks.push({ type: "bullet", text: clean });
+      }
+    } else if (/^\d+\.\s+\[/.test(trimmed)) {
+      blocks.push({ type: "charge", text: trimmed });
+    } else if (/^[└├]/.test(trimmed)) {
+      blocks.push({ type: "sub", text: trimmed.replace(/^[└├]─*\s*/, "↳ ") });
+    } else {
+      blocks.push({ type: "para", text: trimmed });
     }
-
-    // Section headers like [1. INFORMATIONS...] or [CHEFS D'INCULPATION...]
-    if (/^\[.+\]$/.test(trimmed)) {
-      parsedBlocks.push({ type: "section", text: trimmed.replace(/^\[|\]$/g, "") });
-      continue;
-    }
-
-    // Key-Value bullet like "• Date & Heure : 25/11/2026"
-    const kvMatch = trimmed.match(/^[•\-]\s*([^:]{2,42})\s*:\s*(.*)$/);
-    if (kvMatch) {
-      parsedBlocks.push({
-        type: "kv",
-        label: kvMatch[1].trim(),
-        value: kvMatch[2].trim()
-      });
-      continue;
-    }
-
-    // Sub-detail line starting with ↳
-    if (trimmed.startsWith("↳")) {
-      parsedBlocks.push({ type: "sub", text: trimmed });
-      continue;
-    }
-
-    // Numbered offense item e.g. "1. [Art. 403 | ...]"
-    if (/^\d+\.\s+\[/.test(trimmed)) {
-      parsedBlocks.push({ type: "charge", text: trimmed });
-      continue;
-    }
-
-    parsedBlocks.push({ type: "paragraph", text: trimmed });
   }
 
-  // First pass: measure height
-  const measureCanvas = document.createElement("canvas");
-  const mCtx = measureCanvas.getContext("2d");
+  // Measure canvas to compute exact dynamic height
+  const mCanvas = document.createElement("canvas");
+  const mCtx = mCanvas.getContext("2d");
 
+  let bodyHeight = 20;
   const laidOut = [];
-  let bodyHeight = 0;
 
-  for (const block of parsedBlocks) {
+  for (const block of blocks) {
     if (block.type === "spacer") {
-      bodyHeight += 10;
-      laidOut.push({ ...block, h: 10 });
+      bodyHeight += block.h;
+      laidOut.push(block);
     } else if (block.type === "section") {
-      bodyHeight += 38;
-      laidOut.push({ ...block, h: 38 });
+      const h = 38;
+      bodyHeight += h;
+      laidOut.push({ ...block, h });
     } else if (block.type === "kv") {
       const labelText = `▪ ${block.label} :`;
       mCtx.font = "700 14px 'Inter', sans-serif";
       const labelWidth = mCtx.measureText(labelText).width;
       const valStr = block.value || "—";
 
-      // Si le libellé est long (> 290px) ou le texte est un long récit (> 85 caractères),
-      // on affiche le libellé sur sa propre ligne puis le contenu en pleine largeur dessous (zéro chevauchement).
       const useStacked = labelWidth > 290 || valStr.length > 85;
-
       if (useStacked) {
-        mCtx.font = "400 14.5px 'Inter', sans-serif";
-        const valLines = wrapLines(mCtx, valStr, contentWidth - 32);
+        mCtx.font = "500 14.5px 'Inter', sans-serif";
+        const valLines = wrapLines(mCtx, valStr, contentWidth - 28);
         const h = 24 + valLines.length * 21 + 8;
         bodyHeight += h;
         laidOut.push({ ...block, labelText, stacked: true, valLines, h });
@@ -259,9 +289,59 @@ export function generatePrintablePaperCanvas({
     }
   }
 
+  // Measure Exhibits / Preuves Jointes layout
+  const validExhibits = Array.isArray(exhibits) ? exhibits : [];
+  const photoExhibits = validExhibits.filter(ex => ex.imageEl || ex.imageData || ex.imageUrl);
+  const textExhibits = validExhibits.filter(ex => !ex.imageEl && !ex.imageData && !ex.imageUrl);
+
+  const photoCardGap = 16;
+  const photoCardW = photoExhibits.length === 1 ? contentWidth : (contentWidth - photoCardGap) / 2;
+  const photoImgH = photoExhibits.length === 1 ? 360 : 235;
+
+  const laidOutPhotoCards = photoExhibits.map(ex => {
+    mCtx.font = "700 13.5px 'Inter', sans-serif";
+    const titleLines = wrapLines(mCtx, ex.title || "Preuve photographique", photoCardW - 22);
+    mCtx.font = "400 12px 'Inter', sans-serif";
+    const descLines = ex.description ? wrapLines(mCtx, ex.description, photoCardW - 22) : [];
+    const captionH = 14 + titleLines.length * 18 + (descLines.length > 0 ? 4 + descLines.length * 16 : 0) + 10;
+    const cardH = 30 + photoImgH + captionH;
+    return { ...ex, titleLines, descLines, cardH };
+  });
+
+  // Group photo cards into rows of 2 (or 1 if single photo)
+  const photoRows = [];
+  if (laidOutPhotoCards.length === 1) {
+    photoRows.push({ items: [laidOutPhotoCards[0]], rowH: laidOutPhotoCards[0].cardH });
+  } else {
+    for (let i = 0; i < laidOutPhotoCards.length; i += 2) {
+      const pair = laidOutPhotoCards.slice(i, i + 2);
+      const rowH = Math.max(...pair.map(p => p.cardH));
+      photoRows.push({ items: pair, rowH });
+    }
+  }
+
+  const laidOutTextExhibits = textExhibits.map(ex => {
+    mCtx.font = "400 13px 'Inter', sans-serif";
+    const descLines = ex.description ? wrapLines(mCtx, ex.description, contentWidth - 32) : [];
+    const h = 34 + (descLines.length > 0 ? descLines.length * 18 + 8 : 6);
+    return { ...ex, descLines, h };
+  });
+
+  let exhibitsHeight = 0;
+  if (validExhibits.length > 0) {
+    exhibitsHeight += 48; // section header + top spacing
+    for (const te of laidOutTextExhibits) {
+      exhibitsHeight += te.h + 10;
+    }
+    for (const pr of photoRows) {
+      exhibitsHeight += pr.rowH + 16;
+    }
+    exhibitsHeight += 10;
+  }
+
   const headerHeight = 205;
   const footerHeight = 185;
-  const totalHeight = Math.max(1380, headerHeight + bodyHeight + footerHeight);
+  const totalHeight = Math.max(1380, headerHeight + bodyHeight + exhibitsHeight + footerHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(width * scale);
@@ -273,7 +353,7 @@ export function generatePrintablePaperCanvas({
   ctx.fillStyle = "#fafaf6";
   ctx.fillRect(0, 0, width, totalHeight);
 
-  // Subtle paper vignette / border frame
+  // Outer Navy + Inner Gold border frame
   ctx.strokeStyle = "#0b1e36";
   ctx.lineWidth = 2.5;
   ctx.strokeRect(24, 24, width - 48, totalHeight - 48);
@@ -282,17 +362,8 @@ export function generatePrintablePaperCanvas({
   ctx.lineWidth = 1;
   ctx.strokeRect(30, 30, width - 60, totalHeight - 60);
 
-  // Subtle diagonal background watermark
-  ctx.save();
-  ctx.translate(width / 2, totalHeight / 2);
-  ctx.rotate((-32 * Math.PI) / 180);
-  ctx.fillStyle = "rgba(11, 30, 54, 0.04)";
-  ctx.textAlign = "center";
-  ctx.font = "900 58px 'Orbitron', sans-serif";
-  ctx.fillText("LOS SANTOS POLICE DEPT.", 0, 0);
-  ctx.font = "800 32px 'Inter', sans-serif";
-  ctx.fillText("OFFICIAL RECORD — SAN ANDREAS", 0, 48);
-  ctx.restore();
+  // Official LSPD Logo + Text Watermark
+  drawLspdWatermark(ctx, width, totalHeight);
 
   // 2. Official LSPD Letterhead Banner
   ctx.fillStyle = "#0b1e36";
@@ -302,7 +373,7 @@ export function generatePrintablePaperCanvas({
   ctx.fillStyle = "#c59b27";
   ctx.fillRect(31, 149, width - 62, 4);
 
-  // Badge on left
+  // Real LSPD Official Logo on left
   drawLspdBadge(ctx, 96, 90, 42);
 
   // Header Titles
@@ -316,11 +387,14 @@ export function generatePrintablePaperCanvas({
 
   ctx.fillStyle = "#cbd5e1";
   ctx.font = "700 13.5px 'Inter', sans-serif";
-  ctx.fillText(extractedSubtitle.slice(0, 68), 156, 116);
+  const bannerSubtitle = exhibitsOnly
+    ? `ANNEXE PREUVES & PIÈCES À CONVICTION — ${title}`
+    : extractedSubtitle;
+  ctx.fillText(bannerSubtitle.slice(0, 68), 156, 116);
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "600 11px 'JetBrains Mono', monospace";
-  ctx.fillText("DOCUMENT IMPRIMABLE OFFICIEL — TERMINAL MDT LSPD", 156, 136);
+  ctx.fillText("DOCUMENT IMPRIMABLE OFFICIEL — TERMINAL MDT LSPD / DOJ", 156, 136);
 
   // Top-right Reference Box
   ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -339,7 +413,7 @@ export function generatePrintablePaperCanvas({
   ctx.fillStyle = "#94a3b8";
   ctx.font = "600 10.5px 'Inter', sans-serif";
   ctx.fillText(`DATE : ${todayStr}`, width - 224, 106);
-  ctx.fillText("STATUT : OFFICIEL LSPD", width - 224, 121);
+  ctx.fillText(`STATUT : ${statusLabel}`.slice(0, 26), width - 224, 121);
 
   // Sub-strip info bar (Agent / Prévenu)
   ctx.fillStyle = "#eef2f7";
@@ -353,7 +427,7 @@ export function generatePrintablePaperCanvas({
   ctx.fillText(`OFFICIER : ${agent || "LSPD"}`, marginX + 12, 184);
   if (prevenu) {
     ctx.textAlign = "right";
-    ctx.fillText(`CONCERNÉ / PRÉVENU : ${prevenu}`, width - marginX - 12, 184);
+    ctx.fillText(`CONCERNÉ / CIBLE : ${prevenu}`, width - marginX - 12, 184);
     ctx.textAlign = "left";
   }
 
@@ -369,40 +443,32 @@ export function generatePrintablePaperCanvas({
       ctx.fillRect(marginX, curY, 5, 24);
       ctx.fillStyle = "#eef3f9";
       ctx.fillRect(marginX + 5, curY, contentWidth - 5, 24);
-
       ctx.fillStyle = "#0b1e36";
       ctx.font = "800 13px 'Inter', sans-serif";
-      ctx.fillText(item.text.toUpperCase(), marginX + 14, curY + 16.5);
-
+      ctx.fillText(item.text.toUpperCase(), marginX + 14, curY + 16);
       curY += 32;
     } else if (item.type === "kv") {
-      ctx.fillStyle = "#0b1e36";
+      ctx.fillStyle = "#0f172a";
       ctx.font = "700 14px 'Inter', sans-serif";
       ctx.fillText(item.labelText, marginX + 6, curY + 16);
 
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "500 14.5px 'Inter', sans-serif";
       if (item.stacked) {
-        ctx.fillStyle = "#1e293b";
-        ctx.font = "400 14.5px 'Inter', sans-serif";
-        let ly = curY + 38;
-        item.valLines.forEach(line => {
-          ctx.fillText(line, marginX + 22, ly);
-          ly += 21;
+        item.valLines.forEach((vl, li) => {
+          ctx.fillText(vl, marginX + 22, curY + 38 + li * 21);
         });
       } else {
-        ctx.fillStyle = "#0f172a";
-        ctx.font = "500 14.5px 'Inter', sans-serif";
-        let ly = curY + 16;
-        item.valLines.forEach(line => {
-          ctx.fillText(line, marginX + item.valOffsetX, ly);
-          ly += 21;
+        item.valLines.forEach((vl, li) => {
+          ctx.fillText(vl, marginX + item.valOffsetX, curY + 16 + li * 21);
         });
       }
 
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 0.7;
       ctx.beginPath();
-      ctx.moveTo(marginX + 6, curY + item.h - 2);
-      ctx.lineTo(width - marginX - 6, curY + item.h - 2);
+      ctx.moveTo(marginX + 4, curY + item.h - 2);
+      ctx.lineTo(width - marginX - 4, curY + item.h - 2);
       ctx.stroke();
 
       curY += item.h;
@@ -410,34 +476,173 @@ export function generatePrintablePaperCanvas({
       ctx.fillStyle = "#f1f5f9";
       ctx.fillRect(marginX + 4, curY, contentWidth - 8, item.h - 4);
       ctx.fillStyle = "#1d4ed8";
-      ctx.fillRect(marginX + 4, curY, 3, item.h - 4);
+      ctx.fillRect(marginX + 4, curY, 3.5, item.h - 4);
 
       ctx.fillStyle = "#0b1e36";
       ctx.font = "700 14.5px 'Inter', sans-serif";
-      let ly = curY + 18;
-      item.lines.forEach(line => {
-        ctx.fillText(line, marginX + 16, ly);
-        ly += 22;
+      item.lines.forEach((l, li) => {
+        ctx.fillText(l, marginX + 14, curY + 18 + li * 22);
       });
       curY += item.h;
     } else if (item.type === "sub") {
-      ctx.fillStyle = "#334155";
-      ctx.font = "600 13.5px 'Inter', sans-serif";
-      let ly = curY + 15;
-      item.lines.forEach(line => {
-        ctx.fillText(line, marginX + 28, ly);
-        ly += 20;
+      ctx.fillStyle = "#475569";
+      ctx.font = "500 13.5px 'Inter', sans-serif";
+      item.lines.forEach((l, li) => {
+        ctx.fillText(l, marginX + 26, curY + 15 + li * 20);
+      });
+      curY += item.h;
+    } else if (item.type === "bullet") {
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "500 14px 'Inter', sans-serif";
+      item.lines.forEach((l, li) => {
+        ctx.fillText((li === 0 ? "• " : "  ") + l, marginX + 10, curY + 15 + li * 21);
       });
       curY += item.h;
     } else {
       ctx.fillStyle = "#1e293b";
       ctx.font = "400 14.5px 'Inter', sans-serif";
-      let ly = curY + 15;
-      item.lines.forEach(line => {
-        ctx.fillText(line, marginX + 6, ly);
-        ly += 21;
+      item.lines.forEach((l, li) => {
+        ctx.fillText(l, marginX + 4, curY + 16 + li * 21);
       });
       curY += item.h;
+    }
+  }
+
+  // 3B. Render Attached Exhibits & Photo Proofs (Pièces à conviction / Preuves DOJ)
+  if (validExhibits.length > 0) {
+    curY += 10;
+    ctx.fillStyle = "#0b1e36";
+    ctx.fillRect(marginX, curY, 5, 26);
+    ctx.fillStyle = "#eef3f9";
+    ctx.fillRect(marginX + 5, curY, contentWidth - 5, 26);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(marginX, curY, contentWidth, 26);
+    ctx.fillStyle = "#0b1e36";
+    ctx.font = "800 13px 'Inter', sans-serif";
+    ctx.fillText(
+      `ANNEXE — PIÈCES À CONVICTION & PREUVES JOINTES AU DOSSIER (${validExhibits.length})`,
+      marginX + 14,
+      curY + 17
+    );
+    curY += 36;
+
+    // Text-only exhibits first
+    for (const te of laidOutTextExhibits) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(marginX, curY, contentWidth, te.h);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(marginX, curY, contentWidth, te.h);
+      ctx.fillStyle = "#c59b27";
+      ctx.fillRect(marginX, curY, 4.5, te.h);
+
+      ctx.fillStyle = "#0b1e36";
+      ctx.font = "800 12px 'JetBrains Mono', monospace";
+      const codeStr = `[${te.code || "PIÈCE"}]`;
+      ctx.fillText(codeStr, marginX + 14, curY + 20);
+      const cw = ctx.measureText(codeStr).width;
+
+      ctx.font = "700 13.5px 'Inter', sans-serif";
+      ctx.fillText(te.title || "Pièce jointe", marginX + 22 + cw, curY + 20);
+
+      if (te.source || te.date) {
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#64748b";
+        ctx.font = "600 11px 'Inter', sans-serif";
+        ctx.fillText([te.source, te.date].filter(Boolean).join(" • "), width - marginX - 12, curY + 20);
+        ctx.textAlign = "left";
+      }
+
+      if (te.descLines.length > 0) {
+        ctx.fillStyle = "#334155";
+        ctx.font = "400 13px 'Inter', sans-serif";
+        te.descLines.forEach((l, li) => {
+          ctx.fillText(l, marginX + 14, curY + 40 + li * 18);
+        });
+      }
+
+      curY += te.h + 10;
+    }
+
+    // Photo exhibits grid
+    for (const pr of photoRows) {
+      pr.items.forEach((card, colIdx) => {
+        const cx = marginX + colIdx * (photoCardW + photoCardGap);
+        const cardH = pr.rowH;
+
+        // Card container
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(cx, curY, photoCardW, cardH);
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(cx, curY, photoCardW, cardH);
+
+        // Top navy exhibit ribbon
+        ctx.fillStyle = "#0b1e36";
+        ctx.fillRect(cx, curY, photoCardW, 28);
+        ctx.fillStyle = "#dfb556";
+        ctx.font = "800 11.5px 'JetBrains Mono', monospace";
+        ctx.fillText(card.code || "PIÈCE", cx + 10, curY + 18);
+
+        if (card.source || card.date) {
+          ctx.textAlign = "right";
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "600 10.5px 'Inter', sans-serif";
+          ctx.fillText([card.source, card.date].filter(Boolean).join(" • ").slice(0, 38), cx + photoCardW - 10, curY + 18);
+          ctx.textAlign = "left";
+        }
+
+        // Photo dark matte frame
+        const imgBoxY = curY + 28;
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(cx + 1, imgBoxY, photoCardW - 2, photoImgH);
+
+        if (card.imageEl && card.imageEl.naturalWidth > 0) {
+          const iw = card.imageEl.naturalWidth;
+          const ih = card.imageEl.naturalHeight;
+          const boxW = photoCardW - 12;
+          const boxH = photoImgH - 12;
+          const ratio = Math.min(boxW / iw, boxH / ih);
+          const drawW = iw * ratio;
+          const drawH = ih * ratio;
+          const dx = cx + (photoCardW - drawW) / 2;
+          const dy = imgBoxY + (photoImgH - drawH) / 2;
+
+          ctx.save();
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(card.imageEl, dx, dy, drawW, drawH);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = "#94a3b8";
+          ctx.textAlign = "center";
+          ctx.font = "600 12px 'Inter', sans-serif";
+          ctx.fillText("Image non chargée (vérifiez le lien ou importez le fichier)", cx + photoCardW / 2, imgBoxY + photoImgH / 2);
+          ctx.textAlign = "left";
+        }
+
+        // Caption below photo
+        let capY = imgBoxY + photoImgH + 20;
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "700 13.5px 'Inter', sans-serif";
+        card.titleLines.forEach(tl => {
+          ctx.fillText(tl, cx + 11, capY);
+          capY += 18;
+        });
+
+        if (card.descLines.length > 0) {
+          capY += 2;
+          ctx.fillStyle = "#475569";
+          ctx.font = "400 12px 'Inter', sans-serif";
+          card.descLines.forEach(dl => {
+            ctx.fillText(dl, cx + 11, capY);
+            capY += 16;
+          });
+        }
+      });
+
+      curY += pr.rowH + 16;
     }
   }
 
@@ -464,13 +669,13 @@ export function generatePrintablePaperCanvas({
   ctx.fillText(`${agent || "LSPD"} — Le ${todayStr}`, marginX, sigY + 78);
 
   // Center: Authentic LSPD Ink Stamp
-  drawInkStamp(ctx, width / 2, sigY + 48, todayStr, docNumber);
+  drawInkStamp(ctx, width / 2, sigY + 48, todayStr, docNumber, stampTopText, stampMainText);
 
   // Right: Command / DOJ Visa Box
   ctx.fillStyle = "#475569";
   ctx.textAlign = "right";
   ctx.font = "700 11px 'Inter', sans-serif";
-  ctx.fillText("VISA COMMANDEMENT / BUREAU DU PROCUREUR", width - marginX, sigY + 22);
+  ctx.fillText("VISA COMMANDEMENT / BUREAU DU PROCUREUR / JUGE", width - marginX, sigY + 22);
   ctx.strokeStyle = "#cbd5e1";
   ctx.strokeRect(width - marginX - 230, sigY + 32, 230, 50);
   if (commandVisa && commandVisa.trim()) {

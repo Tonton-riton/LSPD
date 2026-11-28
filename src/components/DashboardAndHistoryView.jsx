@@ -156,6 +156,19 @@ export default function DashboardAndHistoryView({
               </button>
             </div>
 
+            <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("doj-requests")}>
+              <div className="weapon-card-top">
+                <div className="weapon-name">Demandes DOJ & Descentes</div>
+                <span className="weapon-badge badge-sniper">10 Templates + Preuves</span>
+              </div>
+              <div className="weapon-desc">
+                Rédiger vos demandes de descente (Raid QG), perquisitions, mandats d'arrêt, écoutes, joindre des preuves photos et imprimer en jeu.
+              </div>
+              <button className="btn btn-primary btn-sm">
+                <i className="fas fa-gavel"></i> Ouvrir les demandes DOJ
+              </button>
+            </div>
+
             <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("investigations")}>
               <div className="weapon-card-top">
                 <div className="weapon-name">Dossiers d'Enquête & Templates</div>

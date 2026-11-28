@@ -5,7 +5,7 @@
 // signature manuscrite de l'officier, tampon encre "CERTIFIÉ CONFORME" et Visa DOJ.
 
 import { formatCurrency, formatMinutesToHours, formatRetentionHours } from "./formulaEngine";
-import { drawLspdBadge, drawInkStamp } from "./generatePrintableReport";
+import { drawLspdBadge, drawInkStamp, drawLspdWatermark } from "./generatePrintableReport";
 
 function wrapTextLines(ctx, text, maxWidth) {
   if (!text) return [];
@@ -183,17 +183,8 @@ export function generatePenaltyCanvas({
   ctx.lineWidth = 1;
   ctx.strokeRect(30, 30, width - 60, totalHeight - 60);
 
-  // Subtle diagonal background watermark
-  ctx.save();
-  ctx.translate(width / 2, totalHeight / 2);
-  ctx.rotate((-32 * Math.PI) / 180);
-  ctx.fillStyle = "rgba(11, 30, 54, 0.04)";
-  ctx.textAlign = "center";
-  ctx.font = "900 58px 'Orbitron', sans-serif";
-  ctx.fillText("LOS SANTOS POLICE DEPT.", 0, 0);
-  ctx.font = "800 32px 'Inter', sans-serif";
-  ctx.fillText("OFFICIAL RECORD — SAN ANDREAS", 0, 48);
-  ctx.restore();
+  // Official LSPD Logo + Text Watermark
+  drawLspdWatermark(ctx, width, totalHeight);
 
   // 2. Official LSPD Letterhead Banner (identique aux rapports)
   ctx.fillStyle = "#0b1e36";

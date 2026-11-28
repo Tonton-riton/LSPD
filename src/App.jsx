@@ -13,6 +13,9 @@ import ProceduresAndCodesView from "./components/ProceduresAndCodesView";
 import SettingsAndFormulasView from "./components/SettingsAndFormulasView";
 import DashboardAndHistoryView from "./components/DashboardAndHistoryView";
 import InvestigationsView, { LSPD_TEMPLATES } from "./components/InvestigationsView";
+import DojRequestsView from "./components/DojRequestsView";
+import { DOJ_TEMPLATES } from "./data/dojTemplates";
+import { LSPD_LOGO_DATA_URL } from "./assets/lspdLogo";
 
 const STORAGE_KEYS = {
   THEME: "sa_mdt_theme_v4",
@@ -34,8 +37,9 @@ const NAV_SECTIONS = [
     ]
   },
   {
-    section: "// DETECTIVE BUREAU & TEMPLATES",
+    section: "// DETECTIVE BUREAU & DOJ",
     items: [
+      { page: "doj-requests",   icon: "gavel",       label: "Demandes DOJ & Descentes", badgeKey: "dojTemplates" },
       { page: "investigations", icon: "user-secret", label: "Dossiers d'Enquête & Templates", badgeKey: "templates" }
     ]
   },
@@ -58,6 +62,7 @@ const NAV_SECTIONS = [
 const PAGE_TITLES = {
   dashboard: "TERMINAL LSPD — TABLEAU DE BORD OPÉRATIONNEL",
   calculator: "CALCULATEUR DE PEINES & RAPPORT D'ARRESTATION (MDT)",
+  "doj-requests": "DOJ — DEMANDES DE DESCENTE, MANDATS & PREUVES JOINTES",
   investigations: "DETECTIVE BUREAU — DOSSIERS D'ENQUÊTE & TEMPLATES LSPD",
   history: "REGISTRE & ARCHIVES DES ARRESTATIONS LSPD",
   "penal-table": "CODE PÉNAL — CATALOGUE DES INFRACTIONS & AGGRAVANTES (243)",
@@ -390,15 +395,11 @@ export default function App() {
       {/* BANDEAU SUPÉRIEUR OFFICIEL LSPD / SAN ANDREAS */}
       <header id="lspd-top-ribbon">
         <div className="lspd-ribbon-left">
-          <svg viewBox="0 0 20 14" width="16" height="11">
-            <rect width="20" height="14" fill="#0b1e36" />
-            <line x1="0" y1="2.5" x2="20" y2="2.5" stroke="#3b82f6" strokeWidth="1.4" />
-            <line x1="0" y1="5.5" x2="20" y2="5.5" stroke="#ffffff" strokeWidth="1.3" />
-            <line x1="0" y1="8.5" x2="20" y2="8.5" stroke="#3b82f6" strokeWidth="1.4" />
-            <line x1="0" y1="11.5" x2="20" y2="11.5" stroke="#ffffff" strokeWidth="1.3" />
-            <rect width="8" height="7" fill="#002147" />
-            <circle cx="4" cy="3.5" r="1.4" fill="#dfb556" />
-          </svg>
+          <img
+            src={LSPD_LOGO_DATA_URL}
+            alt="Logo LSPD"
+            style={{ width: 18, height: 18, objectFit: "contain", borderRadius: "50%" }}
+          />
           <span>VILLE DE LOS SANTOS · LOS SANTOS POLICE DEPARTMENT & DEPARTMENT OF JUSTICE</span>
         </div>
         <div className="lspd-ribbon-center">
@@ -413,17 +414,17 @@ export default function App() {
       {/* SIDEBAR OFFICIELLE LSPD AVEC SCEAU & SECTIONS */}
       <nav className={`sidebar${sidebarOpen ? " open" : ""}`}>
         <div className="lspd-seal-header">
-          <svg viewBox="0 0 100 100" width="52" height="52" style={{ flexShrink: 0 }}>
-            <circle cx="50" cy="50" r="47" fill="#081529" stroke="#c59b27" strokeWidth="2.5" />
-            <circle cx="50" cy="50" r="42" fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3 2" />
-            <circle cx="28" cy="19" r="1.8" fill="#dfb556" />
-            <circle cx="39" cy="14" r="1.8" fill="#dfb556" />
-            <circle cx="50" cy="12" r="2.3" fill="#dfb556" />
-            <circle cx="61" cy="14" r="1.8" fill="#dfb556" />
-            <circle cx="72" cy="19" r="1.8" fill="#dfb556" />
-            <path d="M29 29 L71 29 L71 53 Q71 75 50 84 Q29 75 29 53 Z" fill="#102544" stroke="#dfb556" strokeWidth="2" />
-            <polygon points="50,36 54,46 65,46 56,52 59,63 50,56 41,63 44,52 35,46 46,46" fill="#dfb556" />
-          </svg>
+          <img
+            src={LSPD_LOGO_DATA_URL}
+            alt="Sceau Officiel LSPD"
+            style={{
+              width: 54,
+              height: 54,
+              objectFit: "contain",
+              flexShrink: 0,
+              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.55))"
+            }}
+          />
           <div className="lspd-seal-titles">
             <h2>LSPD — MDT</h2>
             <p>PROTECT & SERVE · SAN ANDREAS</p>
@@ -450,6 +451,11 @@ export default function App() {
                   )}
                   {item.badgeKey === "history" && history.length > 0 && (
                     <span className="brand-badge">{history.length}</span>
+                  )}
+                  {item.badgeKey === "dojTemplates" && (
+                    <span className="brand-badge" style={{ color: "var(--gold-seal)", borderColor: "rgba(223,181,86,0.45)" }}>
+                      {DOJ_TEMPLATES.length} DOJ
+                    </span>
                   )}
                   {item.badgeKey === "templates" && (
                     <span className="brand-badge" style={{ color: "var(--gold-seal)", borderColor: "rgba(223,181,86,0.4)" }}>
@@ -535,14 +541,22 @@ export default function App() {
             <i className="fas fa-bars"></i>
           </button>
           <h1 style={{ fontSize: 17 }}>{PAGE_TITLES[activeTab] || "TERMINAL LSPD"}</h1>
-          <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => setActiveTab("doj-requests")}
+              style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 6, fontSize: 12, borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+            >
+              <i className="fas fa-gavel"></i>
+              <span className="hide-mobile">Demandes DOJ & Descentes</span>
+            </button>
             <button
               className="btn btn-sm btn-outline"
               onClick={() => setActiveTab("investigations")}
-              style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 6, fontSize: 12, borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
+              style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
             >
-              <i className="fas fa-user-secret"></i>
-              <span className="hide-mobile">Dossiers d'Enquête & Templates</span>
+              <i className="fas fa-user-secret" style={{ color: "var(--accent)" }}></i>
+              <span className="hide-mobile">Enquêtes & Templates</span>
             </button>
             <button
               className="btn btn-sm btn-outline"
@@ -555,8 +569,12 @@ export default function App() {
             </button>
             <div className="topbar-user">
               <span>#{agentMatricule} · {agentDisplayName}</span>
-              <span className="role-badge patron" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                <i className="fas fa-shield-halved"></i>
+              <span className="role-badge patron" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <img
+                  src={LSPD_LOGO_DATA_URL}
+                  alt="LSPD"
+                  style={{ width: 16, height: 16, objectFit: "contain", borderRadius: "50%" }}
+                />
                 {(meta.roleLabel || "OFFICIER LSPD").toUpperCase()}
               </span>
             </div>
@@ -594,6 +612,13 @@ export default function App() {
               onValidateAndArchive={handleValidateAndArchive}
               activeReportTemplateId={activeReportTemplateId}
               setActiveReportTemplateId={setActiveReportTemplateId}
+            />
+          )}
+
+          {activeTab === "doj-requests" && (
+            <DojRequestsView
+              meta={meta}
+              onSendSuspectToCalculator={handleSendSuspectToCalculator}
             />
           )}
 

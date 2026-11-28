@@ -9,6 +9,7 @@ import { generatePenaltyCanvas } from "../utils/generatePenaltyImage";
 import { syncSigningAgentInText } from "../utils/generatePrintableReport";
 import { LSPD_TEMPLATES } from "../data/lspdTemplates";
 import PrintReportModal from "./PrintReportModal";
+import { LSPD_LOGO_DATA_URL } from "../assets/lspdLogo";
 
 export function getCategoryBadgeClass(cat) {
   const c = String(cat || "").toLowerCase();
@@ -455,8 +456,9 @@ export default function CalculatorView({
       {/* LEFT CARD: CALCULATOR & CART */}
       <div className="card">
         <div className="card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-          <h2>
-            <i className="fas fa-shield-halved"></i> Enregistrer une arrestation / Calculer une peine
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <img src={LSPD_LOGO_DATA_URL} alt="LSPD" style={{ width: 24, height: 24, objectFit: "contain" }} />
+            <span>Enregistrer une arrestation / Calculer une peine</span>
           </h2>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
