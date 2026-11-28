@@ -295,10 +295,16 @@ export function generatePrintablePaperCanvas({
       continue;
     }
 
+    const innerBracket = /^\[(.+)\]$/.exec(trimmed)?.[1] || "";
+    const isRealSectionBracket =
+      Boolean(innerBracket) &&
+      innerBracket.length <= 86 &&
+      (/^\d+\./.test(innerBracket) || innerBracket === innerBracket.toUpperCase());
+
     if (!trimmed) {
       blocks.push({ type: "spacer", h: 10 });
-    } else if (/^\[.+\]$/.test(trimmed)) {
-      blocks.push({ type: "section", text: trimmed.slice(1, -1) });
+    } else if (isRealSectionBracket) {
+      blocks.push({ type: "section", text: innerBracket });
     } else if (/^━━/.test(trimmed)) {
       blocks.push({ type: "section", text: trimmed.replace(/━/g, "").trim() });
     } else if (/^[•\-▪]\s+/.test(trimmed)) {
@@ -334,9 +340,12 @@ export function generatePrintablePaperCanvas({
       bodyHeight += block.h;
       laidOut.push(block);
     } else if (block.type === "section") {
-      const h = 38;
+      mCtx.font = "800 13px 'Inter', sans-serif";
+      const lines = wrapLines(mCtx, block.text.toUpperCase(), contentWidth - 24);
+      const boxH = Math.max(24, lines.length * 18 + 8);
+      const h = boxH + 14;
       bodyHeight += h;
-      laidOut.push({ ...block, h });
+      laidOut.push({ ...block, lines, boxH, h });
     } else if (block.type === "kv") {
       const labelText = `▪ ${block.label} :`;
       mCtx.font = "700 14px 'Inter', sans-serif";
@@ -546,14 +555,17 @@ export function generatePrintablePaperCanvas({
       curY += item.h;
     } else if (item.type === "section") {
       curY += 6;
+      const boxH = item.boxH || 24;
       ctx.fillStyle = "#0b1e36";
-      ctx.fillRect(marginX, curY, 5, 24);
+      ctx.fillRect(marginX, curY, 5, boxH);
       ctx.fillStyle = "#eef3f9";
-      ctx.fillRect(marginX + 5, curY, contentWidth - 5, 24);
+      ctx.fillRect(marginX + 5, curY, contentWidth - 5, boxH);
       ctx.fillStyle = "#0b1e36";
       ctx.font = "800 13px 'Inter', sans-serif";
-      ctx.fillText(item.text.toUpperCase(), marginX + 14, curY + 16);
-      curY += 32;
+      (item.lines || [item.text.toUpperCase()]).forEach((sl, li) => {
+        ctx.fillText(sl, marginX + 14, curY + 16 + li * 18);
+      });
+      curY += boxH + 8;
     } else if (item.type === "kv") {
       ctx.fillStyle = "#0f172a";
       ctx.font = "700 14px 'Inter', sans-serif";
