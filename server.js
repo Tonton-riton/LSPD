@@ -29,7 +29,9 @@ import {
   saveInvestigation,
   deleteInvestigation,
   getSettings,
-  saveSettings
+  saveSettings,
+  savePrintedImageToDb,
+  getPrintedImageFromDb
 } from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -164,6 +166,7 @@ async function handleApiRequest(req, res, safeUrl) {
     } catch {
       // ignore disk errors
     }
+    await savePrintedImageToDb(filename, buffer);
     return sendJson(res, 200, { ok: true, filename, path: `/printed/${filename}` });
   }
 
@@ -512,6 +515,17 @@ const server = http.createServer(async (req, res) => {
         return res.end(data);
       });
       return;
+    }
+
+    const dbBuf = await getPrintedImageFromDb(filename);
+    if (dbBuf) {
+      printedCache.set(filename, dbBuf);
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400'
+      });
+      return res.end(dbBuf);
     }
 
     res.writeHead(404);

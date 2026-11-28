@@ -121,8 +121,19 @@
 
 .sidebar {
   top: 30px !important;
+  height: calc(100vh - 30px) !important;
   background: linear-gradient(180deg, #070f1e 0%, #050a14 100%) !important;
   border-right: 1px solid #1b3358 !important;
+}
+
+.lspd-seal-header {
+  flex-shrink: 0;
+}
+
+.sidebar .nav-menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .topbar {

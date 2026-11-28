@@ -1,6 +1,7 @@
 // Grades officiels LSPD & DOJ utilisés dans les comptes, inscriptions, badges et gestion des rôles
 
 export const LSPD_RANKS = [
+  "Rookie",
   "Officier",
   "Officier II",
   "Officier III",

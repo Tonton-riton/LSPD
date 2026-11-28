@@ -210,6 +210,12 @@ export async function initDb() {
         key TEXT PRIMARY KEY,
         value JSONB NOT NULL DEFAULT '{}'::jsonb
       );
+
+      CREATE TABLE IF NOT EXISTS printed_images (
+        filename TEXT PRIMARY KEY,
+        data BYTEA NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
   } else {
     usePostgres = false;
@@ -920,4 +926,36 @@ export async function saveSettings(patch) {
   localStore.settings = merged;
   saveLocalStore();
   return merged;
+}
+
+// =========================================================================
+// PRINTED IMAGES (PERSISTANCE PERMANENTE DES LIENS .PNG POUR IMPRIMANTES FIVEM)
+// =========================================================================
+export async function savePrintedImageToDb(filename, buffer) {
+  if (!usePostgres) return;
+  try {
+    await pool.query(
+      `INSERT INTO printed_images (filename, data) VALUES ($1, $2)
+       ON CONFLICT (filename) DO UPDATE SET data = EXCLUDED.data, created_at = NOW()`,
+      [filename, buffer]
+    );
+    // Garde les 150 derniers documents imprimés pour éviter de saturer le quota gratuit
+    await pool.query(
+      `DELETE FROM printed_images WHERE filename NOT IN (
+         SELECT filename FROM printed_images ORDER BY created_at DESC LIMIT 150
+       )`
+    );
+  } catch (err) {
+    console.error('[DB] Erreur sauvegarde printed_images:', err.message);
+  }
+}
+
+export async function getPrintedImageFromDb(filename) {
+  if (!usePostgres) return null;
+  try {
+    const { rows } = await pool.query('SELECT data FROM printed_images WHERE filename = $1', [filename]);
+    return rows[0]?.data || null;
+  } catch {
+    return null;
+  }
 }

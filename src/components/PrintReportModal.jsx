@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   generatePrintablePaperCanvas,
   triggerBrowserPrint,
@@ -6,6 +6,9 @@ import {
   loadExhibitImages
 } from "../utils/generatePrintableReport";
 import { ensureLspdLogoLoaded } from "../assets/lspdLogo";
+
+// Référence stable pour éviter toute boucle infinie de rendu quand exhibits n'est pas fourni
+const EMPTY_EXHIBITS = [];
 
 export default function PrintReportModal({
   isOpen,
@@ -19,7 +22,7 @@ export default function PrintReportModal({
   initialCommandVisa = "",
   prevenu,
   reportText,
-  exhibits = [],
+  exhibits = EMPTY_EXHIBITS,
   stampTopText = "LSPD • SAN ANDREAS",
   stampMainText = "CERTIFIÉ CONFORME",
   statusLabel = "OFFICIEL LSPD",
@@ -35,12 +38,35 @@ export default function PrintReportModal({
   const [canvasRef, setCanvasRef] = useState(null);
   const [directUrl, setDirectUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [statusMsg, setStatusMsg] = useState(null);
   const [savedIndicator, setSavedIndicator] = useState(false);
+
   const wasOpenRef = useRef(false);
   const didAutoCopyRef = useRef(false);
+  const exhibitsRef = useRef(exhibits);
+  exhibitsRef.current = exhibits;
+  const renderCustomCanvasRef = useRef(renderCustomCanvas);
+  renderCustomCanvasRef.current = renderCustomCanvas;
 
   const hasExhibits = Array.isArray(exhibits) && exhibits.length > 0;
+  const hasCustomBuilder = typeof renderCustomCanvas === "function";
+
+  // Clé primitive stable représentant les preuves (évite de relancer l'effet sur la synchro 5s)
+  const exhibitsKey = useMemo(() => {
+    if (!Array.isArray(exhibits) || exhibits.length === 0) return "";
+    return JSON.stringify(
+      exhibits.map(ex => [
+        ex.id || "",
+        ex.code || "",
+        ex.title || "",
+        ex.source || "",
+        ex.date || "",
+        ex.description || "",
+        (ex.imageData || ex.imageUrl || "").slice(0, 80)
+      ])
+    );
+  }, [exhibits]);
 
   // Synchronise les champs UNIQUEMENT à l'ouverture de la modale (sans écraser pendant la saisie)
   useEffect(() => {
@@ -50,6 +76,8 @@ export default function PrintReportModal({
       setCommandVisa(initialCommandVisa || "");
       setExhibitPrintMode("all");
       setSavedIndicator(false);
+      setDirectUrl("");
+      setUploadError("");
       didAutoCopyRef.current = false;
     }
     wasOpenRef.current = isOpen;
@@ -61,8 +89,9 @@ export default function PrintReportModal({
   }, []);
 
   const uploadToPrinterEndpoint = useCallback(async (urlData, docRef) => {
-    if (!window.location.protocol.startsWith("http")) return;
+    if (!urlData || !window.location.protocol.startsWith("http")) return;
     setUploading(true);
+    setUploadError("");
     try {
       const resp = await fetch("/api/print-image", {
         method: "POST",
@@ -77,79 +106,89 @@ export default function PrintReportModal({
         if (data && data.path) {
           setDirectUrl(`${window.location.origin}${data.path}`);
         }
+      } else {
+        const errData = await resp.json().catch(() => ({}));
+        setUploadError(errData.error || `Erreur serveur (${resp.status}) lors de la création du lien .PNG`);
       }
     } catch {
-      // mode offline
+      setUploadError("Impossible de joindre le serveur d'impression. Utilisez « Copier Image » ou « Télécharger .PNG ».");
     } finally {
       setUploading(false);
     }
   }, []);
 
-  // Re-rend la feuille papier A4 en temps réel (attend le chargement du logo LSPD & des preuves photos)
+  // Re-rend la feuille papier A4 en temps réel (attend le logo LSPD & les preuves photos)
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     let uploadTimer = null;
 
     (async () => {
-      await ensureLspdLogoLoaded();
-      const loadedExhibits =
-        hasExhibits && exhibitPrintMode !== "text_only"
-          ? await loadExhibitImages(exhibits)
-          : [];
+      try {
+        await ensureLspdLogoLoaded();
+        const currentExhibits = exhibitsRef.current || EMPTY_EXHIBITS;
+        const loadedExhibits =
+          currentExhibits.length > 0 && exhibitPrintMode !== "text_only"
+            ? await loadExhibitImages(currentExhibits)
+            : EMPTY_EXHIBITS;
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      let canvas;
-      if (typeof renderCustomCanvas === "function") {
-        canvas = renderCustomCanvas({
-          signingAgent,
-          commandVisa,
-          docNumber: editableDocNumber
-        });
-      } else {
-        const adjustedText = syncSigningAgentInText(reportText, signingAgent);
-        canvas = generatePrintablePaperCanvas({
-          title,
-          docNumber: editableDocNumber,
-          date,
-          agent: signingAgent,
-          commandVisa,
-          prevenu,
-          reportText: adjustedText,
-          exhibits: loadedExhibits,
-          exhibitsOnly: exhibitPrintMode === "exhibits_only",
-          stampTopText,
-          stampMainText,
-          statusLabel
-        });
-      }
-
-      const url = canvas.toDataURL("image/png");
-      if (cancelled) return;
-      setCanvasRef(canvas);
-      setDataUrl(url);
-
-      // Copie automatique optionnelle à l'ouverture (ex: Fiche Amendes)
-      if (autoCopyOnOpen && !didAutoCopyRef.current) {
-        didAutoCopyRef.current = true;
-        canvas.toBlob(async blob => {
-          try {
-            if (blob && navigator.clipboard && window.ClipboardItem) {
-              await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
-              showStatus("Feuille A4 copiée dans le presse-papiers ! Collez sur Discord (Ctrl+V) ou utilisez le lien d'imprimante FiveM.");
-            }
-          } catch {
-            // ignore
-          }
-        }, "image/png");
-      }
-
-      uploadTimer = setTimeout(() => {
-        if (!cancelled) {
-          uploadToPrinterEndpoint(url, editableDocNumber);
+        let canvas;
+        if (hasCustomBuilder && typeof renderCustomCanvasRef.current === "function") {
+          canvas = renderCustomCanvasRef.current({
+            signingAgent,
+            commandVisa,
+            docNumber: editableDocNumber
+          });
+        } else {
+          const adjustedText = syncSigningAgentInText(reportText, signingAgent);
+          canvas = generatePrintablePaperCanvas({
+            title,
+            docNumber: editableDocNumber,
+            date,
+            agent: signingAgent,
+            commandVisa,
+            prevenu,
+            reportText: adjustedText,
+            exhibits: loadedExhibits,
+            exhibitsOnly: exhibitPrintMode === "exhibits_only",
+            stampTopText,
+            stampMainText,
+            statusLabel
+          });
         }
-      }, 380);
+
+        const url = canvas.toDataURL("image/png");
+        if (cancelled) return;
+        setCanvasRef(canvas);
+        setDataUrl(url);
+
+        // Copie automatique optionnelle à l'ouverture (ex: Fiche Amendes)
+        if (autoCopyOnOpen && !didAutoCopyRef.current) {
+          didAutoCopyRef.current = true;
+          canvas.toBlob(async blob => {
+            try {
+              if (blob && navigator.clipboard && window.ClipboardItem) {
+                await navigator.clipboard.write([new window.ClipboardItem({ "image/png": blob })]);
+                showStatus("Feuille A4 copiée dans le presse-papiers ! Collez sur Discord (Ctrl+V) ou utilisez le lien d'imprimante FiveM.");
+              }
+            } catch {
+              // ignore
+            }
+          }, "image/png");
+        }
+
+        uploadTimer = setTimeout(() => {
+          if (!cancelled) {
+            uploadToPrinterEndpoint(url, editableDocNumber);
+          }
+        }, 350);
+      } catch (err) {
+        if (!cancelled) {
+          setUploadError(`Erreur de rendu de la feuille : ${err?.message || "Image externe bloquée (CORS)"}`);
+        }
+      }
     })();
 
     return () => {
@@ -165,13 +204,12 @@ export default function PrintReportModal({
     commandVisa,
     prevenu,
     reportText,
-    exhibits,
-    hasExhibits,
+    exhibitsKey,
     exhibitPrintMode,
     stampTopText,
     stampMainText,
     statusLabel,
-    renderCustomCanvas,
+    hasCustomBuilder,
     autoCopyOnOpen,
     showStatus,
     uploadToPrinterEndpoint
@@ -360,7 +398,7 @@ export default function PrintReportModal({
         </div>
 
         {/* SÉLECTEUR D'IMPRESSION DES PREUVES (SI DES PIÈCES JOINTES SONT PRÉSENTES) */}
-        {hasExhibits && !renderCustomCanvas && (
+        {hasExhibits && !hasCustomBuilder && (
           <div
             style={{
               padding: "8px 20px",
@@ -419,12 +457,24 @@ export default function PrintReportModal({
               <i className="fas fa-link" style={{ marginRight: 6 }}></i>
               LIEN DIRECT POUR IMPRIMANTE IN-GAME (FIVEM — URL .PNG) :
             </span>
-            {uploading && (
-              <span style={{ fontSize: 12, color: "var(--blue)" }}>
-                <i className="fas fa-spinner fa-spin" style={{ marginRight: 5 }}></i>
-                Mise à jour du lien .PNG...
-              </span>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {uploading && (
+                <span style={{ fontSize: 12, color: "var(--blue)" }}>
+                  <i className="fas fa-spinner fa-spin" style={{ marginRight: 5 }}></i>
+                  Génération du lien .PNG...
+                </span>
+              )}
+              {dataUrl && !uploading && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  style={{ padding: "3px 8px", fontSize: 11 }}
+                  onClick={() => uploadToPrinterEndpoint(dataUrl, editableDocNumber)}
+                >
+                  <i className="fas fa-arrows-rotate"></i> Régénérer lien
+                </button>
+              )}
+            </div>
           </div>
 
           {directUrl ? (
@@ -442,10 +492,12 @@ export default function PrintReportModal({
               </button>
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-              {uploading
-                ? "Préparation de l'URL..."
-                : "Astuce FiveM : Sur votre site Render en ligne, un lien direct .PNG s'affiche ici automatiquement. En local, utilisez « Copier Image » puis collez sur Discord pour obtenir le lien d'imprimante RP."}
+            <div style={{ fontSize: 12, color: uploadError ? "#fca5a5" : "var(--text-secondary)" }}>
+              {uploadError
+                ? uploadError
+                : uploading
+                ? "Préparation de l'URL directe .PNG pour FiveM..."
+                : "Astuce FiveM : Sur votre site Render en ligne, un lien direct .PNG s'affiche ici automatiquement. En local, utilisez « Copier Image » puis collez sur Discord."}
             </div>
           )}
         </div>
@@ -477,7 +529,7 @@ export default function PrintReportModal({
             padding: 20
           }}
         >
-          {dataUrl && (
+          {dataUrl ? (
             <img
               src={dataUrl}
               alt="Feuille imprimable officielle LSPD"
@@ -489,6 +541,11 @@ export default function PrintReportModal({
                 boxShadow: "0 14px 45px rgba(0,0,0,0.75)"
               }}
             />
+          ) : (
+            <div style={{ padding: 40, color: "var(--text-muted)", fontSize: 14 }}>
+              <i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
+              Préparation de la feuille officielle LSPD...
+            </div>
           )}
         </div>
       </div>

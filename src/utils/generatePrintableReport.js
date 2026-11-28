@@ -706,32 +706,62 @@ export function generatePrintablePaperCanvas({
 }
 
 /**
- * Ouvre la fenêtre d'impression native du navigateur (Imprimante réelle ou Enregistrer en PDF)
+ * Ouvre la fenêtre d'impression native du navigateur via iframe cachée (fonctionne même si les pop-ups sont bloqués !)
  */
 export function triggerBrowserPrint(dataUrl, title = "Rapport LSPD") {
-  const win = window.open("", "_blank", "width=900,height=1100");
-  if (!win) {
-    alert("Veuillez autoriser les pop-ups pour lancer l'impression PDF, ou téléchargez l'image PNG.");
-    return;
-  }
-  win.document.write(`<!DOCTYPE html>
+  try {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <title>${title}</title>
   <style>
     @page { size: A4 portrait; margin: 0; }
-    body { margin: 0; padding: 0; background: #1e293b; display: flex; justify-content: center; }
-    img { max-width: 100%; height: auto; display: block; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
-    @media print {
-      body { background: #fff; }
-      img { width: 100%; box-shadow: none; }
-    }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    img { width: 100%; height: auto; display: block; }
   </style>
 </head>
 <body>
-  <img src="${dataUrl}" onload="setTimeout(() => { window.print(); }, 250);" />
+  <img src="${dataUrl}" />
 </body>
 </html>`);
-  win.document.close();
+    doc.close();
+
+    const img = doc.querySelector("img");
+    const doPrint = () => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } finally {
+        setTimeout(() => {
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }, 2000);
+      }
+    };
+
+    if (img && !img.complete) {
+      img.onload = () => setTimeout(doPrint, 150);
+    } else {
+      setTimeout(doPrint, 150);
+    }
+  } catch {
+    const win = window.open("", "_blank", "width=900,height=1100");
+    if (!win) {
+      alert("Téléchargez l'image .PNG ou utilisez Copier Image pour imprimer.");
+      return;
+    }
+    win.document.write(`<html><body style="margin:0"><img src="${dataUrl}" style="width:100%" onload="window.print()" /></body></html>`);
+    win.document.close();
+  }
 }
