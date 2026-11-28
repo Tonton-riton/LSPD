@@ -145,14 +145,27 @@ export default function DashboardAndHistoryView({
           <div className="catalogue-grid">
             <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("calculator")}>
               <div className="weapon-card-top">
-                <div className="weapon-name">Calculateur de Peines & Rapport</div>
+                <div className="weapon-name">Calculateur de Peines</div>
                 <span className="weapon-badge badge-pistolet">MDT</span>
               </div>
               <div className="weapon-desc">
-                Calculer les amendes, peines, circonstances aggravantes, paliers MIN 1 à MAXIMAL, générer l'image PNG et le Rapport d'Arrestation LSPD.
+                Calculer les amendes, peines, circonstances aggravantes, paliers MIN 1 à MAXIMAL et générer la Fiche Peines A4 (.PNG).
               </div>
               <button className="btn btn-primary btn-sm">
                 <i className="fas fa-calculator"></i> Ouvrir le calculateur
+              </button>
+            </div>
+
+            <div className="weapon-card" style={{ cursor: "pointer" }} onClick={() => onNavigate("reports")}>
+              <div className="weapon-card-top">
+                <div className="weapon-name">Rapports d'Arrestation & Transfert DOJ</div>
+                <span className="weapon-badge badge-pistolet">Onglet Dédié</span>
+              </div>
+              <div className="weapon-desc">
+                Rédiger, modifier, imprimer en jeu vos rapports d'arrestation et les transférer directement au DOJ pour validation.
+              </div>
+              <button className="btn btn-primary btn-sm">
+                <i className="fas fa-file-shield"></i> Ouvrir les rapports
               </button>
             </div>
 

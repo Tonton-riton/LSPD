@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { DOJ_TEMPLATES, DOJ_TEMPLATE_GROUPS } from "../data/dojTemplates";
 import PrintReportModal from "./PrintReportModal";
 import { syncSigningAgentInText } from "../utils/generatePrintableReport";
@@ -7,12 +7,13 @@ import { LSPD_LOGO_DATA_URL } from "../assets/lspdLogo";
 const STORAGE_DOJ_KEY = "sa_lspd_doj_requests_v1";
 
 const DOJ_STATUS_BADGES = {
-  draft:     { label: "Brouillon LSPD",       color: "#94a3b8", bg: "rgba(148, 163, 184, 0.16)" },
-  submitted: { label: "Soumis au Procureur",  color: "#38bdf8", bg: "rgba(56, 189, 248, 0.16)" },
-  pending:   { label: "En attente Juge",      color: "#f59e0b", bg: "rgba(245, 158, 11, 0.16)" },
-  approved:  { label: "Mandat Approuvé DOJ",  color: "#00e676", bg: "rgba(0, 230, 118, 0.16)" },
-  executed:  { label: "Mandat Exécuté",       color: "#3b82f6", bg: "rgba(59, 130, 246, 0.18)" },
-  rejected:  { label: "Refusé / Complément",  color: "#ef4444", bg: "rgba(239, 68, 68, 0.16)" }
+  draft:             { label: "Brouillon LSPD",          color: "#94a3b8", bg: "rgba(148, 163, 184, 0.16)" },
+  submitted:         { label: "Transmis au DOJ",         color: "#38bdf8", bg: "rgba(56, 189, 248, 0.16)" },
+  pending:           { label: "En attente Juge",         color: "#f59e0b", bg: "rgba(245, 158, 11, 0.16)" },
+  approved:          { label: "Mandat Approuvé DOJ",     color: "#00e676", bg: "rgba(0, 230, 118, 0.16)" },
+  changes_requested: { label: "Complément requis (DOJ)", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.22)" },
+  executed:          { label: "Mandat Exécuté",          color: "#3b82f6", bg: "rgba(59, 130, 246, 0.18)" },
+  rejected:          { label: "Mandat Refusé (DOJ)",     color: "#ef4444", bg: "rgba(239, 68, 68, 0.16)" }
 };
 
 const URGENCY_BADGES = {
@@ -118,8 +119,20 @@ function buildInitialSampleRequests() {
   return [sample];
 }
 
-export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
+export default function DojRequestsView({
+  meta,
+  onSendSuspectToCalculator,
+  serverRequests = null,
+  onSaveDojRequest,
+  onDeleteDojRequest,
+  onRefreshDojRequests,
+  currentUser
+}) {
+  const isServerSynced = Array.isArray(serverRequests) && typeof onSaveDojRequest === "function";
+  const canSetDojStatusDirectly = Boolean(currentUser && ["DOJ", "HIGH_COMMAND", "ADMIN"].includes(currentUser.role));
+
   const [requests, setRequests] = useState(() => {
+    if (isServerSynced) return serverRequests;
     try {
       const saved = localStorage.getItem(STORAGE_DOJ_KEY);
       if (saved) {
@@ -131,6 +144,15 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
       return buildInitialSampleRequests();
     }
   });
+
+  useEffect(() => {
+    if (isServerSynced) {
+      setRequests(serverRequests);
+    }
+  }, [isServerSynced, serverRequests]);
+
+  const syncTimerRef = useRef(null);
+  const [savingToServer, setSavingToServer] = useState(false);
 
   const [activeReqId, setActiveReqId] = useState(() => requests[0]?.id || null);
   const [subView, setSubView] = useState("dossiers"); // "templates" | "dossiers"
@@ -168,8 +190,20 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
     urgency: "critical"
   });
 
-  const saveRequests = (next) => {
+  const saveRequests = (next, changedItem = null, immediateServerSave = false) => {
     setRequests(next);
+    if (isServerSynced && changedItem) {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      if (immediateServerSave) {
+        setSavingToServer(true);
+        Promise.resolve(onSaveDojRequest(changedItem)).finally(() => setSavingToServer(false));
+      } else {
+        syncTimerRef.current = setTimeout(() => {
+          onSaveDojRequest(changedItem);
+        }, 650);
+      }
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_DOJ_KEY, JSON.stringify(next));
       setStorageWarning(null);
@@ -215,31 +249,45 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
 
   const handlePatchRequestById = (reqId, patch) => {
     if (!reqId) return;
+    let updatedTarget = null;
     setRequests(prev => {
-      const next = prev.map(r => (r.id === reqId ? { ...r, ...patch } : r));
-      try {
-        localStorage.setItem(STORAGE_DOJ_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
+      const next = prev.map(r => {
+        if (r.id !== reqId) return r;
+        updatedTarget = { ...r, ...patch };
+        return updatedTarget;
+      });
+      if (!isServerSynced) {
+        try {
+          localStorage.setItem(STORAGE_DOJ_KEY, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
       }
       return next;
     });
+    if (isServerSynced && updatedTarget) {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      syncTimerRef.current = setTimeout(() => onSaveDojRequest(updatedTarget), 450);
+    }
   };
 
-  const handleUpdateActiveReq = (field, value) => {
+  const handleUpdateActiveReq = (field, value, immediate = false) => {
     if (!activeReq) return;
+    let updatedItem = null;
     const next = requests.map(r => {
       if (r.id !== activeReq.id) return r;
       if (field === "leadAgent" && r.reportText) {
-        return {
+        updatedItem = {
           ...r,
           leadAgent: value,
           reportText: syncSigningAgentInText(r.reportText, value)
         };
+        return updatedItem;
       }
-      return { ...r, [field]: value };
+      updatedItem = { ...r, [field]: value };
+      return updatedItem;
     });
-    saveRequests(next);
+    saveRequests(next, updatedItem, immediate);
   };
 
   const handleCreateRequest = (e) => {
@@ -288,7 +336,7 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
     };
 
     const next = [created, ...requests];
-    saveRequests(next);
+    saveRequests(next, created, true);
     setActiveReqId(created.id);
     setShowNewModal(false);
     setSubView("dossiers");
@@ -348,7 +396,7 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
     };
 
     const next = [created, ...requests];
-    saveRequests(next);
+    saveRequests(next, created, true);
     setActiveReqId(created.id);
     setSubView("dossiers");
   };
@@ -377,6 +425,9 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
 
   const handleDeleteRequest = (id) => {
     const next = requests.filter(r => r.id !== id);
+    if (isServerSynced && onDeleteDojRequest) {
+      onDeleteDojRequest(id);
+    }
     saveRequests(next);
     if (activeReqId === id) {
       setActiveReqId(next[0]?.id || null);
@@ -557,13 +608,20 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
             </button>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setShowNewModal(true)}
-          >
-            <i className="fas fa-plus-circle"></i> Nouvelle Demande DOJ
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {onRefreshDojRequests && (
+              <button type="button" className="btn btn-sm btn-outline" onClick={onRefreshDojRequests}>
+                <i className="fas fa-arrows-rotate"></i> Actualiser
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowNewModal(true)}
+            >
+              <i className="fas fa-plus-circle"></i> Nouvelle Demande DOJ
+            </button>
+          </div>
         </div>
       </div>
 
@@ -821,6 +879,57 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
           {/* RIGHT WORKSPACE: METADATA + PHOTO EVIDENCE + EDITABLE DOJ REQUEST */}
           {activeReq ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {/* BANDEAU DÉCISION / RETOUR DU DOJ */}
+              {activeReq.status && activeReq.status !== "draft" && (
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    borderRadius: 10,
+                    background: (DOJ_STATUS_BADGES[activeReq.status] || DOJ_STATUS_BADGES.submitted).bg,
+                    border: `1.5px solid ${(DOJ_STATUS_BADGES[activeReq.status] || DOJ_STATUS_BADGES.submitted).color}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        fontSize: 15,
+                        color: (DOJ_STATUS_BADGES[activeReq.status] || DOJ_STATUS_BADGES.submitted).color
+                      }}
+                    >
+                      <i className="fas fa-gavel" style={{ marginRight: 8 }}></i>
+                      STATUT DOJ : {(DOJ_STATUS_BADGES[activeReq.status] || DOJ_STATUS_BADGES.submitted).label.toUpperCase()}
+                    </span>
+                    {activeReq.dojReviewerName && (
+                      <span className="mono" style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                        Décision de : <strong>{activeReq.dojReviewerName}</strong>{" "}
+                        {activeReq.dojReviewedAt ? `• ${activeReq.dojReviewedAt}` : ""}
+                      </span>
+                    )}
+                  </div>
+                  {activeReq.dojComment && (
+                    <div
+                      style={{
+                        background: "rgba(5, 10, 20, 0.55)",
+                        padding: "10px 12px",
+                        borderRadius: 6,
+                        color: "#ffffff",
+                        fontSize: 14,
+                        lineHeight: 1.5
+                      }}
+                    >
+                      <strong style={{ color: (DOJ_STATUS_BADGES[activeReq.status] || DOJ_STATUS_BADGES.submitted).color }}>
+                        Explication / Retour DOJ :
+                      </strong>{" "}
+                      {activeReq.dojComment}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 1. METADATA & SIGNATURES */}
               <div className="card">
                 <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
@@ -829,6 +938,34 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
                     <span>Requête {activeReq.requestNumber} — {activeReq.title}</span>
                   </h2>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {isServerSynced && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        disabled={savingToServer}
+                        onClick={() => saveRequests(requests, activeReq, true)}
+                      >
+                        <i className={`fas fa-${savingToServer ? "spinner fa-spin" : "floppy-disk"}`}></i> Enregistrer
+                      </button>
+                    )}
+
+                    {activeReq.status !== "approved" && activeReq.status !== "executed" && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        disabled={savingToServer}
+                        onClick={() => handleUpdateActiveReq("status", "submitted", true)}
+                        style={{ borderColor: "var(--gold-seal)" }}
+                      >
+                        <i className="fas fa-paper-plane"></i>{" "}
+                        {activeReq.status === "changes_requested" || activeReq.status === "rejected"
+                          ? "Re-transférer au DOJ"
+                          : activeReq.status === "submitted"
+                          ? "Actualiser au DOJ"
+                          : "Transférer au DOJ"}
+                      </button>
+                    )}
+
                     {onSendSuspectToCalculator && activeReq.targetName && (
                       <button
                         type="button"
@@ -855,6 +992,7 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
                             : activeReq.targetName,
                           reportText: activeReq.reportText,
                           exhibits: activeReq.exhibits || [],
+                          approved: activeReq.status === "approved",
                           statusLabel: (DOJ_STATUS_BADGES[activeReq.status]?.label || "DOSSIER DOJ").toUpperCase()
                         })
                       }
@@ -890,10 +1028,11 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Statut DOJ</label>
+                      <label>Statut DOJ {!canSetDojStatusDirectly && isServerSynced ? "(Validé par le DOJ)" : ""}</label>
                       <select
                         value={activeReq.status}
-                        onChange={e => handleUpdateActiveReq("status", e.target.value)}
+                        disabled={isServerSynced && !canSetDojStatusDirectly}
+                        onChange={e => handleUpdateActiveReq("status", e.target.value, true)}
                       >
                         {Object.entries(DOJ_STATUS_BADGES).map(([k, v]) => (
                           <option key={k} value={k}>{v.label}</option>
@@ -1436,8 +1575,8 @@ export default function DojRequestsView({ meta, onSendSuspectToCalculator }) {
         prevenu={printPayload?.prevenu}
         reportText={printPayload?.reportText}
         exhibits={printPayload?.exhibits || []}
-        stampTopText="LSPD • REQUÊTE DOJ"
-        stampMainText="DOSSIER JUDICIAIRE"
+        stampTopText={printPayload?.approved ? "DOJ • SAN ANDREAS" : "LSPD • REQUÊTE DOJ"}
+        stampMainText={printPayload?.approved ? "MANDAT APPROUVÉ" : "DOSSIER JUDICIAIRE"}
         statusLabel={printPayload?.statusLabel || "REQUÊTE DOJ"}
         onSaveChanges={
           printPayload?.reqId

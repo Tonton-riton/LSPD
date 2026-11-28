@@ -38,6 +38,7 @@ export default function CalculatorView({
   onResetToSheetSample,
   onOpenSettings,
   onValidateAndArchive,
+  onCreateReportFromCalculator,
   activeReportTemplateId,
   setActiveReportTemplateId
 }) {
@@ -416,11 +417,26 @@ export default function CalculatorView({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const activeText = outputTab === "miranda" ? editedMirandaText : editedReportText;
-    navigator.clipboard.writeText(activeText);
+    const rowsSnap = summary.activeRows.map(r => ({
+      infractionId: r.infractionId,
+      aggravanteIds: r.aggravanteIds,
+      aggravantesLabels: r.calc.selectedAggravantesObjects.map(a => a.circonstance),
+      qte: r.qte,
+      tentative: r.tentative,
+      complicite: r.complicite,
+      avocat: r.avocat,
+      article: r.calc.article,
+      chefAccusation: r.calc.chefAccusation,
+      categorie: r.calc.categorie,
+      totalFine: r.calc.totalFine,
+      totalPeineMinutes: r.calc.totalPeineMinutes
+    }));
+
+    const refNum = serial || generateDossierRef("LSPD");
+
     if (onValidateAndArchive) {
       onValidateAndArchive({
-        id: serial || generateDossierRef("LSPD"),
+        id: refNum,
         date: meta.date,
         heure: meta.heure,
         agent: meta.agent,
@@ -434,19 +450,26 @@ export default function CalculatorView({
         notes,
         commandVisa: "",
         reportText: editedReportText,
-        rowsSnapshot: summary.activeRows.map(r => ({
-          infractionId: r.infractionId,
-          aggravanteIds: r.aggravanteIds,
-          qte: r.qte,
-          tentative: r.tentative,
-          complicite: r.complicite,
-          avocat: r.avocat,
-          article: r.calc.article,
-          chefAccusation: r.calc.chefAccusation,
-          categorie: r.calc.categorie,
-          totalFine: r.calc.totalFine,
-          totalPeineMinutes: r.calc.totalPeineMinutes
-        }))
+        rowsSnapshot: rowsSnap
+      });
+    }
+
+    if (onCreateReportFromCalculator) {
+      onCreateReportFromCalculator({
+        reportNumber: refNum,
+        authorName: meta.agent,
+        prevenu: meta.prevenu,
+        date: meta.date,
+        heure: meta.heure,
+        templateId: activeReportTemplateId || "standard",
+        palierRetenu: activePalier.label,
+        amendeRetenue: activePalier.amende,
+        peineMinutes: activePalier.peineMinutes,
+        rowsSnapshot: rowsSnap,
+        reportText: editedReportText,
+        notes,
+        commandVisa: "",
+        dojStatus: "draft"
       });
     }
   };
@@ -979,13 +1002,13 @@ export default function CalculatorView({
                 className="btn btn-outline btn-full"
                 onClick={handleCopyImageToClipboard}
                 disabled={summary.activeRows.length === 0}
-                style={{ borderColor: "var(--accent)", color: "var(--text-primary)" }}
+                style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
               >
-                <i className="fas fa-camera" style={{ color: "var(--accent)" }}></i> Générer & Copier l'Image des Amendes
+                <i className="fas fa-print"></i> Fiche Peines A4 (.PNG / Imprimer)
               </button>
 
               <button type="submit" className="btn btn-primary btn-full" disabled={summary.activeRows.length === 0}>
-                <i className="fas fa-check"></i> Valider la peine & Copier le Rapport
+                <i className="fas fa-file-shield"></i> Créer & Ouvrir le Rapport d'Arrestation →
               </button>
             </div>
           </form>
@@ -1147,41 +1170,15 @@ export default function CalculatorView({
           </div>
         </div>
 
-        {/* RAPPORT D'ARRESTATION LSPD & DROITS MIRANDA — 100% MODIFIABLE & COPIABLE */}
+        {/* DROITS CONSTITUTIONNELS MIRANDA (CELLULE N3) — SÉPARÉ DE L'ONGLET RAPPORTS */}
         <div className="card">
           <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                type="button"
-                className={`btn btn-sm ${outputTab === "rapport" ? "btn-primary" : "btn-outline"}`}
-                onClick={() => setOutputTab("rapport")}
-              >
-                <i className="fas fa-file-shield"></i> Rapport d'Arrestation LSPD
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${outputTab === "miranda" ? "btn-primary" : "btn-outline"}`}
-                onClick={() => setOutputTab("miranda")}
-              >
-                <i className="fas fa-scroll"></i> Droits Miranda (N3)
-              </button>
-            </div>
+            <h2>
+              <i className="fas fa-scroll" style={{ color: "var(--gold-seal)" }}></i> Droits Constitutionnels Miranda (N3)
+            </h2>
 
             <div style={{ display: "flex", gap: 6 }}>
-              {outputTab === "rapport" && isReportManuallyEdited && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setIsReportManuallyEdited(false);
-                    setEditedReportText(autoGeneratedReportText);
-                  }}
-                  title="Régénérer le rapport automatique depuis le formulaire"
-                >
-                  <i className="fas fa-arrows-rotate"></i> Régénérer auto
-                </button>
-              )}
-              {outputTab === "miranda" && isMirandaManuallyEdited && (
+              {isMirandaManuallyEdited && (
                 <button
                   type="button"
                   className="btn btn-sm btn-outline"
@@ -1189,121 +1186,70 @@ export default function CalculatorView({
                     setIsMirandaManuallyEdited(false);
                     setEditedMirandaText(summary.mirandaText);
                   }}
-                  title="Régénérer les droits Miranda automatiques"
                 >
-                  <i className="fas fa-arrows-rotate"></i> Régénérer auto
+                  <i className="fas fa-arrows-rotate"></i> Auto
                 </button>
               )}
               <button
                 type="button"
                 className="btn btn-sm btn-outline"
                 style={{ borderColor: "var(--gold-seal)", color: "var(--gold-seal)" }}
-                onClick={() => setShowPrintModal(true)}
-                title="Générer une feuille papier A4 officielle LSPD imprimable en jeu (FiveM) + Lien .PNG direct"
+                onClick={() => {
+                  setOutputTab("miranda");
+                  setShowPrintModal(true);
+                }}
               >
-                <i className="fas fa-print"></i> Imprimer en jeu
+                <i className="fas fa-print"></i> Imprimer
               </button>
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
-                onClick={() =>
-                  handleCopy(
-                    outputTab,
-                    outputTab === "miranda" ? editedMirandaText : editedReportText
-                  )
-                }
+                onClick={() => handleCopy("miranda", editedMirandaText)}
               >
-                <i className={`fas fa-${copiedKey === outputTab ? "check" : "copy"}`}></i>
-                {copiedKey === outputTab ? "Copié dans le presse-papiers !" : "Copier le texte"}
+                <i className={`fas fa-${copiedKey === "miranda" ? "check" : "copy"}`}></i>
+                {copiedKey === "miranda" ? "Copié !" : "Copier"}
               </button>
             </div>
           </div>
 
           <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {outputTab === "rapport" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--gold-seal)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  <i className="fas fa-file-signature" style={{ marginRight: 5 }}></i>
-                  Template de Rapport :
-                </label>
-                <select
-                  className="select"
-                  style={{ flex: 1, padding: "6px 10px", fontSize: 13 }}
-                  value={activeReportTemplateId || "standard"}
-                  onChange={e => {
-                    if (setActiveReportTemplateId) setActiveReportTemplateId(e.target.value);
-                    setIsReportManuallyEdited(false);
-                  }}
-                >
-                  <option value="standard">Rapport d'Arrestation LSPD Standard (Art. 117-5 & 123)</option>
-                  <optgroup label="━━ BRAQUAGES (ART. 403) ━━">
-                    {LSPD_TEMPLATES.filter(t => t.group === "braquage").map(t => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="━━ INTERVENTIONS TERRAIN ━━">
-                    {LSPD_TEMPLATES.filter(t => t.group === "intervention").map(t => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="━━ DETECTIVE BUREAU & MANDATS DOJ ━━">
-                    {LSPD_TEMPLATES.filter(t => t.group === "enquete" || t.group === "doj").map(t => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-            )}
+            <textarea
+              rows={12}
+              className="textarea"
+              style={{
+                fontFamily: "'Rajdhani', sans-serif",
+                fontSize: 14,
+                lineHeight: 1.6,
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+                padding: 14
+              }}
+              value={editedMirandaText}
+              onChange={e => {
+                setIsMirandaManuallyEdited(true);
+                setEditedMirandaText(e.target.value);
+              }}
+            />
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--text-secondary)" }}>
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "rgba(59, 130, 246, 0.08)",
+                border: "1px solid var(--border)",
+                fontSize: 12.5,
+                color: "var(--text-secondary)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              }}
+            >
+              <i className="fas fa-arrow-right" style={{ color: "var(--gold-seal)" }}></i>
               <span>
-                <i className="fas fa-pen" style={{ color: "var(--accent)", marginRight: 6 }}></i>
-                <strong>Zone éditable :</strong> Vous pouvez modifier le texte du rapport directement ci-dessous avant de le copier-coller.
+                Les <strong>Rapports d'Arrestation</strong> ont désormais leur propre onglet dédié (<strong>Rapports d'Arrestation</strong>) avec sauvegarde BDA et <strong>Transfert au DOJ</strong>.
               </span>
-              {(outputTab === "rapport" ? isReportManuallyEdited : isMirandaManuallyEdited) && (
-                <span className="brand-badge">Modifié manuellement</span>
-              )}
             </div>
-
-            {outputTab === "rapport" ? (
-              <textarea
-                rows={22}
-                className="textarea"
-                style={{
-                  fontFamily: "'Rajdhani', sans-serif",
-                  fontSize: 14,
-                  lineHeight: 1.55,
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                  padding: 14
-                }}
-                value={editedReportText}
-                onChange={e => {
-                  setIsReportManuallyEdited(true);
-                  setEditedReportText(e.target.value);
-                }}
-              />
-            ) : (
-              <textarea
-                rows={14}
-                className="textarea"
-                style={{
-                  fontFamily: "'Rajdhani', sans-serif",
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                  padding: 14
-                }}
-                value={editedMirandaText}
-                onChange={e => {
-                  setIsMirandaManuallyEdited(true);
-                  setEditedMirandaText(e.target.value);
-                }}
-              />
-            )}
           </div>
         </div>
       </div>
