@@ -42,22 +42,31 @@ export default function UserManagementView({ currentUser, dbMode }) {
     setTimeout(() => setMsg(null), 4500);
   };
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const [uRes, sRes] = await Promise.all([apiListUsers(), apiGetSettings()]);
+      const [uRes, sRes] = await Promise.all([
+        apiListUsers(),
+        silent ? Promise.resolve(null) : apiGetSettings()
+      ]);
       setUsers(uRes.users || []);
-      setWebhookDojSubmit(sRes.settings?.webhookDojSubmit || "");
-      setWebhookDojDecision(sRes.settings?.webhookDojDecision || "");
+      if (sRes) {
+        setWebhookDojSubmit(sRes.settings?.webhookDojSubmit || "");
+        setWebhookDojDecision(sRes.settings?.webhookDojDecision || "");
+      }
     } catch (err) {
-      showNotice("error", err.message || "Impossible de charger les comptes.");
+      if (!silent) showNotice("error", err.message || "Impossible de charger les comptes.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadAll();
+    loadAll(false);
+    const interval = setInterval(() => {
+      if (!document.hidden) loadAll(true);
+    }, 5000);
+    return () => clearInterval(interval);
   }, [loadAll]);
 
   const handleRoleChange = async (userId, role) => {
@@ -143,7 +152,7 @@ export default function UserManagementView({ currentUser, dbMode }) {
               <i className="fas fa-database" style={{ marginRight: 5 }}></i>
               BDA : {dbMode === "postgresql" ? "PostgreSQL Connectée" : "Stockage Local JSON"}
             </span>
-            <button type="button" className="btn btn-sm btn-outline" onClick={loadAll}>
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => loadAll(false)}>
               <i className="fas fa-arrows-rotate"></i> Actualiser
             </button>
           </div>

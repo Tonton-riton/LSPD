@@ -42,6 +42,8 @@ export default function ReportsView({
   );
 
   const [draft, setDraft] = useState(null);
+  const draftDirtyRef = React.useRef(false);
+  const lastReportIdRef = React.useRef(null);
 
   // Intervention detail helpers (for quick text regeneration)
   const [lieu, setLieu] = useState("Los Santos");
@@ -54,10 +56,33 @@ export default function ReportsView({
   const [circonstances, setCirconstances] = useState("");
 
   useEffect(() => {
-    if (activeReport) {
+    if (!activeReport) {
+      setDraft(null);
+      lastReportIdRef.current = null;
+      draftDirtyRef.current = false;
+      return;
+    }
+    const switchedReport = lastReportIdRef.current !== activeReport.id;
+    lastReportIdRef.current = activeReport.id;
+
+    if (switchedReport || !draftDirtyRef.current) {
+      draftDirtyRef.current = false;
       setDraft({ ...activeReport });
     } else {
-      setDraft(null);
+      // L'agent est en train de taper : on fusionne uniquement les retours DOJ sans écraser sa saisie
+      setDraft(prev =>
+        prev
+          ? {
+              ...prev,
+              dojStatus: activeReport.dojStatus,
+              dojReviewerName: activeReport.dojReviewerName,
+              dojReviewerRank: activeReport.dojReviewerRank,
+              dojComment: activeReport.dojComment,
+              dojReviewedAt: activeReport.dojReviewedAt,
+              commandVisa: activeReport.dojStatus === "approved" ? activeReport.commandVisa : prev.commandVisa
+            }
+          : { ...activeReport }
+      );
     }
   }, [activeReport?.id, activeReport?.updatedAt]);
 
@@ -119,6 +144,7 @@ export default function ReportsView({
     try {
       const payload = { ...draft, ...overridePatch };
       const saved = await onSaveReport(payload);
+      draftDirtyRef.current = false;
       if (saved) setDraft(saved);
     } finally {
       setSaving(false);
@@ -661,7 +687,10 @@ export default function ReportsView({
                     padding: 16
                   }}
                   value={draft.reportText || ""}
-                  onChange={e => setDraft(p => ({ ...p, reportText: e.target.value }))}
+                  onChange={e => {
+                    draftDirtyRef.current = true;
+                    setDraft(p => ({ ...p, reportText: e.target.value }));
+                  }}
                 />
               </div>
             </div>

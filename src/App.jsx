@@ -189,8 +189,34 @@ export default function App() {
 
   const refreshSharedData = useCallback(async () => {
     if (!serverOnline || !getAuthToken()) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
-      const [repRes, dojRes] = await Promise.all([apiListReports(), apiListDojRequests()]);
+      const [repRes, dojRes, meRes] = await Promise.all([
+        apiListReports(),
+        apiListDojRequests(),
+        apiMe().catch(err => ({ _err: err }))
+      ]);
+      if (meRes?._err?.status === 401) {
+        await apiLogout();
+        setCurrentUser(null);
+        return;
+      }
+      if (meRes?.user) {
+        setCurrentUser(prev => {
+          if (
+            prev &&
+            prev.id === meRes.user.id &&
+            prev.role === meRes.user.role &&
+            prev.rank === meRes.user.rank &&
+            prev.matricule === meRes.user.matricule &&
+            prev.fullName === meRes.user.fullName &&
+            prev.status === meRes.user.status
+          ) {
+            return prev;
+          }
+          return meRes.user;
+        });
+      }
       if (Array.isArray(repRes.reports)) setReports(repRes.reports);
       if (Array.isArray(dojRes.requests)) setDojRequests(dojRes.requests);
     } catch {
@@ -244,13 +270,23 @@ export default function App() {
     };
   }, []);
 
-  // Load & periodically refresh shared reports + DOJ requests when logged in
+  // Rechargement automatique des données partagées & rôles toutes les 5 secondes (sans couper la saisie)
+  const currentUserId = currentUser?.id || null;
   useEffect(() => {
-    if (!serverOnline || !currentUser) return;
+    if (!serverOnline || !currentUserId) return;
     refreshSharedData();
-    const interval = setInterval(refreshSharedData, 25000);
-    return () => clearInterval(interval);
-  }, [serverOnline, currentUser, refreshSharedData]);
+    const interval = setInterval(refreshSharedData, 5000);
+    const onFocusOrVisible = () => {
+      if (!document.hidden) refreshSharedData();
+    };
+    window.addEventListener("focus", onFocusOrVisible);
+    document.addEventListener("visibilitychange", onFocusOrVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocusOrVisible);
+      document.removeEventListener("visibilitychange", onFocusOrVisible);
+    };
+  }, [serverOnline, currentUserId, refreshSharedData]);
 
   // Persist local preferences
   useEffect(() => {
@@ -719,7 +755,7 @@ export default function App() {
           <span className="live-green-dot"></span>
           <span>
             {serverOnline
-              ? `BDA ${dbMode === "postgresql" ? "POSTGRESQL" : "SERVEUR"} · CODE 4`
+              ? `BDA ${dbMode === "postgresql" ? "POSTGRESQL" : "SERVEUR"} · SYNCHRO AUTO 5s`
               : "MODE LOCAL HORS-LIGNE"}
           </span>
         </div>

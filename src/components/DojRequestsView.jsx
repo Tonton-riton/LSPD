@@ -145,14 +145,33 @@ export default function DojRequestsView({
     }
   });
 
-  useEffect(() => {
-    if (isServerSynced) {
-      setRequests(serverRequests);
-    }
-  }, [isServerSynced, serverRequests]);
-
   const syncTimerRef = useRef(null);
+  const dirtyIdRef = useRef(null);
+  const dirtyUntilRef = useRef(0);
   const [savingToServer, setSavingToServer] = useState(false);
+
+  useEffect(() => {
+    if (!isServerSynced) return;
+    setRequests(prev => {
+      const hasActiveLocalEdit = dirtyIdRef.current && Date.now() < dirtyUntilRef.current;
+      if (!hasActiveLocalEdit) return serverRequests;
+      const localMap = new Map(prev.map(r => [r.id, r]));
+      return serverRequests.map(sr => {
+        if (sr.id !== dirtyIdRef.current) return sr;
+        const local = localMap.get(sr.id);
+        if (!local) return sr;
+        return {
+          ...local,
+          status: sr.dojReviewerName ? sr.status : local.status,
+          dojReviewerName: sr.dojReviewerName,
+          dojReviewerRank: sr.dojReviewerRank,
+          dojComment: sr.dojComment,
+          dojReviewedAt: sr.dojReviewedAt,
+          commandVisa: sr.dojReviewerName && sr.status === "approved" ? sr.commandVisa : local.commandVisa
+        };
+      });
+    });
+  }, [isServerSynced, serverRequests]);
 
   const [activeReqId, setActiveReqId] = useState(() => requests[0]?.id || null);
   const [subView, setSubView] = useState("dossiers"); // "templates" | "dossiers"
@@ -193,13 +212,20 @@ export default function DojRequestsView({
   const saveRequests = (next, changedItem = null, immediateServerSave = false) => {
     setRequests(next);
     if (isServerSynced && changedItem) {
+      dirtyIdRef.current = changedItem.id;
+      dirtyUntilRef.current = Date.now() + 2500;
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       if (immediateServerSave) {
         setSavingToServer(true);
-        Promise.resolve(onSaveDojRequest(changedItem)).finally(() => setSavingToServer(false));
+        Promise.resolve(onSaveDojRequest(changedItem)).finally(() => {
+          setSavingToServer(false);
+          dirtyUntilRef.current = 0;
+        });
       } else {
         syncTimerRef.current = setTimeout(() => {
-          onSaveDojRequest(changedItem);
+          Promise.resolve(onSaveDojRequest(changedItem)).finally(() => {
+            dirtyUntilRef.current = 0;
+          });
         }, 650);
       }
       return;
